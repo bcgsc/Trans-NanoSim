@@ -29,6 +29,7 @@ import get_besthit
 import besthit_to_histogram as error_model
 
 
+
 # Usage information
 def usage():
     usage_message = "./read_analysis.py <options>\n" \
