@@ -129,7 +129,8 @@ def main(argv):
     features = HTSeq.GenomicArrayOfSets("auto", stranded=False)
     dict_intron_info = {}
     annot_gff3_withintron = annot_filename + "_addedintron.gff3"
-    for feature in annot_gff3_withintron:
+    gff_file = HTSeq.GFF_Reader(annot_gff3_withintron, end_included=True)
+    for feature in gff_file:
         if "Parent" in feature.attr:
             info = feature.attr["Parent"].split(':')
             if info[0] == "transcript":
@@ -137,7 +138,6 @@ def main(argv):
                 if feature_id not in dict_intron_info:
                     dict_intron_info[feature_id] = []
         if feature.type == "intron":
-            # feature_id_2 = feature.name.split(':')[1] #feature_id_2 is same as feature_id above if feature is intron, I was just checking and testing it. then removed this line.
             features[feature.iv] += feature_id
             dict_intron_info[feature_id].append((feature.iv.start, feature.iv.end, feature.iv.length))
 
@@ -159,12 +159,11 @@ def main(argv):
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading the genome alignments\n")
     dict_genome_alignment = {}
     SAM_or_BAM_Reader = HTSeq.SAM_Reader
-    read_seq_file = SAM_or_BAM_Reader(alignment_genome)
-    for read in read_seq_file:
+    read_alignment_genomne = SAM_or_BAM_Reader(alignment_genome)
+    for read in read_alignment_genomne:
         qname = read.read.name
-        #if read.aligned:
         if qname not in dict_genome_alignment:
-            dict_genome_alignment[qname] = read
+            dict_genome_alignment[qname] = read #Read the primary alignment only (ignores the secondary and supp alignments)
 
     # Read the transcriptome alignments to memory:
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading the transcriptome alignments\n")
@@ -174,11 +173,11 @@ def main(argv):
     for read in read_alignment_trx:
         qname = read.read.name
         if qname not in dict_trx_alignment:
-            dict_trx_alignment[qname] = read
+            dict_trx_alignment[qname] = read #Read the primary alignment only (ignores the secondary and supp alignments)
 
     # Aligned reads analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Aligned reads analysis\n")
-    num_aligned = align.head_align_tail(outfile, num_bins)
+    num_aligned = align.head_align_tail(outfile, num_bins, dict_trx_alignment)
 
     # Un-aligned reads analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Un-aligned reads analysis\n")
@@ -193,7 +192,7 @@ def main(argv):
 
     # Length distribution of unaligned reads
     out1 = open(outfile + "_unaligned_length_ecdf", 'w')
-
+    num_aligned = len(dict_trx_alignment) - num_unaligned
     if num_unaligned != 0:
         max_length = max(unaligned_length)
         hist_unaligned, edges_unaligned = numpy.histogram(unaligned_length, bins=numpy.arange(0, max_length + 50, 50),
