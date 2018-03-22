@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 """
-Written by Chen Yang on Mar 25th, 2015
+Written by Saber HafezQorani on March, 2018
 To get the length of head, aligned, and tail regions of an alignment.
 
-Major change in Apr 22nd
-
-Updated in Nov 25th
+Major changes from NanoSim to use minimap output sam file and also develop 2d length distribution.
 """
 
 from __future__ import with_statement
@@ -59,122 +57,110 @@ def flex_bins(num_of_bins, ratio_dict, num_of_reads):
 
     return ratio_bins
 
+def parse_cigar(cigar_string):
+    dict_errors = {}
+    head_info = cigar_string[0]
+    tail_info = cigar_string[-1]
+    if head_info.type == "S":
+        head = head_info.size
+    if tail_info.type == "S":
+        tail = tail_info.size
+    for item in cigar_string:
+        if item.type not in dict_errors:
+            dict_errors[item.type] = [item.size]
+        else:
+            dict_errors[item.type].append(item.size)
 
-def head_align_tail(outfile, num_of_bins):
-    out5 = open(outfile + '_reftransc_totalONT_allbins_ecdf_v2', 'w')
-    out1 = open(outfile + '_reftransc_totalONT_allbins_ecdf', 'w')
-    out2 = open(outfile + '_aligned_reads_ecdf', 'w')
+    return head, tail, dict_errors
+
+def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
+    out1 = open(outfile + '_read_rellen_ecdf', 'w')
+    out2 = open(outfile + '_read_totallen_ecdf', 'w')
     out3 = open(outfile + '_ht_ratio', 'w')
     out4 = open(outfile + "_align_ratio", 'w')
 
-    besthit_out = outfile + "_besthit.maf"
-
-    aligned = []
     total = []
-    ht_ratio = {}
-    align_ratio = {}
-
     list_ref_len = []
-    dict_reflen = {}
+    count_aligned = 0
 
-    with open(besthit_out, 'r') as f:
-        for line in f:
-            ref = line.strip().split()
-            ref_len = int(ref[5])
-            aligned_ref = int(ref[3])
-            aligned.append(aligned_ref)
+    dict_ht_ratio = {}
+    dict_align_ratio = {}
+    dict_rellen = {}
 
-            query = next(f).strip().split()
-            head = int(query[2])
-            middle = int(query[3])
-            tail = int(query[5])-int(query[2])-int(query[3])
-            len_ONT = int(query[5])
-            total.append(len_ONT)
-            ht = int(query[5])-int(query[3])
-            ratio = float(query[3])/float(query[5])
-            rel_len = len_ONT / float(ref_len)
-            #if rel_len > 1:
-                #print("errorrrrrrrrr>>>>", ref[1], query[1],len_ONT, ref_len)
-            if middle in align_ratio:
-                align_ratio[middle].append(ratio)
+    dict_errors_allreads = {"S":[], "M":[], "I":[], "D":[]}
+
+    for qname in dict_trx_alignment:
+        r = dict_trx_alignment[qname]
+        if r.aligned:
+
+            count_aligned += 1
+
+            ref = r.iv.chrom
+            ref_len = dict_ref_len[ref]
+            ref_aligned = r.iv.length
+
+            read_len_total = len(r.read.seq)
+            total.append(read_len_total)
+            head, tail, error_dict = parse_cigar(r.cigar)
+            for key in error_dict:
+                dict_errors_allreads[key].extend[error_dict[key]]
+            middle = read_len_total - head - tail
+
+            #ratio aligned part over total length of the read
+            alignment_ratio = float(middle) / read_len_total
+            if middle not in dict_align_ratio:
+                dict_align_ratio[middle] = [alignment_ratio]
             else:
-                align_ratio[middle] = [ratio]
-            if ht != 0:
-                r = float(head) / ht
-                if ht in ht_ratio:
-                    ht_ratio[ht].append(r)
+                dict_align_ratio[middle].append(alignment_ratio)
+
+            head_and_tail = head + tail
+            if head != 0:
+                ht_ratio = float(head) / head_and_tail
+                if head_and_tail not in dict_ht_ratio:
+                    dict_ht_ratio[head_and_tail] = [ht_ratio]
                 else:
-                    ht_ratio[ht] = [r]
+                    dict_ht_ratio[head_and_tail].append(ht_ratio)
 
-            list_ref_len.append(ref_len)
-            if ref_len not in dict_reflen:
-                dict_reflen[ref_len] = [rel_len]
+            #relative_length : total len of read over total len of reference transcriptome
+            relative_length = float(read_len_total) / ref_len
+            if ref_len not in dict_rellen:
+                dict_rellen[ref_len] = [relative_length]
             else:
-                dict_reflen[ref_len].append(rel_len)
+                dict_rellen[ref_len].append(relative_length)
 
-            '''
-            len_ONT = int(query[5])
-            if ref_len not in dict_reflen:
-                if len_ONT < ref_len:
-                    dict_reflen[ref_len] = [len_ONT]
-                    list_ref_len.append(ref_len)
-            else:
-                if len_ONT < ref_len:
-                    dict_reflen[ref_len].append(len_ONT)
-                    list_ref_len.append(ref_len)
-            '''
 
-    max_length = max(total)
-    num_aligned = len(aligned)
 
     # ecdf of length of aligned regions (2d length distribution) editted this part - Approach 2 relative length of ONT total over total length of the reference transcriptome it aligned to.
-    rel_len_bins = flex_bins(num_of_bins, dict_reflen, len(list_ref_len))
-
+    rel_len_bins = flex_bins(num_of_bins, dict_rellen, count_aligned)
     rel_len_cum = dict.fromkeys(rel_len_bins.keys(), [])
     for key, value in rel_len_bins.items():
         hist_ratio, bin_edges = numpy.histogram(value, bins=numpy.arange(0, 1.001, 0.001), density=True)
         cdf = numpy.cumsum(hist_ratio * 0.001)
         rel_len_cum[key] = cdf
 
-    out5.write("bins\t" + '\t'.join("%s-%s" % tup for tup in sorted(rel_len_cum.keys())) + '\n')
+    out1.write("bins\t" + '\t'.join("%s-%s" % tup for tup in sorted(rel_len_cum.keys())) + '\n')
     for i in xrange(len(cdf)):
-        out5.write(str(bin_edges[i]) + '-' + str(bin_edges[i + 1]) + "\t")
+        out1.write(str(bin_edges[i]) + '-' + str(bin_edges[i + 1]) + "\t")
         for key in sorted(rel_len_cum.keys()):
-            out5.write(str(rel_len_cum[key][i]) + "\t")
-        out5.write("\n")
-
-    out5.close()
-
+            out1.write(str(rel_len_cum[key][i]) + "\t")
+        out1.write("\n")
+    out1.close()
 
 
-
-    # ecdf of length of aligned regions (2d length distribution) editted this part - Approach 1 considering only length of ONT (total)
-    hist_reflen_bins = flex_bins(num_of_bins, dict_reflen, len(list_ref_len))
-    dict_value = dict.fromkeys(hist_reflen_bins.keys(), [])
-
-    for key, value in hist_reflen_bins.items():
-        dict_value[key] = value
-
-    for item in sorted(dict_value.keys()):
-        out1.write(str(item[0]) + "-" + str(item[1]) + "\t" + "\t".join([str(x) for x in dict_value[item]]) + "\n")
 
     # ecdf of length of aligned reads
+    max_length = max(total)
     hist_reads, bin_edges = numpy.histogram(total, bins=numpy.arange(0, max_length + 50, 50), density=True)
     cdf = numpy.cumsum(hist_reads * 50)
     out2.write("bin\t0-" + str(max_length) + '\n')
     for i in xrange(len(cdf)):
         out2.write(str(bin_edges[i]) + '-' + str(bin_edges[i + 1]) + "\t" + str(cdf[i]) + '\n')
-
-
-
+    out2.close()
 
 
 
     # ecdf of head/total ratio
-    # there needs to be at least one bin
-
-    ht_ratio_bins = flex_bins(num_of_bins, ht_ratio, len(total))
-
+    ht_ratio_bins = flex_bins(num_of_bins, dict_ht_ratio, count_aligned)
     ht_cum = dict.fromkeys(ht_ratio_bins.keys(), [])
     for key, value in ht_ratio_bins.items():
         hist_ht, bin_edges = numpy.histogram(value, bins=numpy.arange(0, 1.001, 0.001), density=True)
@@ -187,10 +173,12 @@ def head_align_tail(outfile, num_of_bins):
         for key in sorted(ht_cum.keys()):
             out3.write(str(ht_cum[key][i]) + "\t")
         out3.write("\n")
+    out3.close()
+
+
 
     # ecdf of align ratio
-    align_ratio_bins = flex_bins(num_of_bins, align_ratio, len(total))
-
+    align_ratio_bins = flex_bins(num_of_bins, dict_align_ratio, count_aligned)
     align_cum = dict.fromkeys(align_ratio_bins.keys(), [])
     for key, value in align_ratio_bins.items():
         hist_ratio, bin_edges = numpy.histogram(value, bins=numpy.arange(0, 1.001, 0.001), density=True)
@@ -203,10 +191,6 @@ def head_align_tail(outfile, num_of_bins):
         for key in sorted(align_cum.keys()):
             out4.write(str(align_cum[key][i]) + "\t")
         out4.write("\n")
-
-    out1.close()
-    out2.close()
-    out3.close()
     out4.close()
 
-    return num_aligned
+    return count_aligned
