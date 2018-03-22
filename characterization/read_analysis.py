@@ -96,25 +96,6 @@ def main(argv):
     # READ PRE-PROCESS AND UNALIGNED READS ANALYSIS
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read pre-process and unaligned reads analysis\n")
 
-    # Read pre-process
-    in_fasta = outfile + ".fasta"
-    if in_fasta == infile:
-        in_fasta = outfile + "_processed.fasta"
-    out_fasta = open(in_fasta, 'w')
-    dic_reads = {}
-    with open(infile, 'r') as f:
-        for line in f:
-            if line[0] == '>':
-                name = '-'.join(line.strip()[1:].split())
-                dic_reads[name] = ""
-            else:
-                dic_reads[name] += line.strip()
-    for k, v in dic_reads.items():
-        out_fasta.write('>' + k + '\n' + v + '\n')
-    out_fasta.close()
-
-    del dic_reads
-
     # Read the annotation GTF/GFF3 file
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Parse the annotation file (GTF/GFF3)\n")
     # If gtf provided, convert to GFF3 (gt gtf_to_gff3)
@@ -141,6 +122,16 @@ def main(argv):
             features[feature.iv] += feature_id
             dict_intron_info[feature_id].append((feature.iv.start, feature.iv.end, feature.iv.length))
 
+    #Read the length of reference transcripts from the reference transcriptome
+    dict_ref_len = {}
+    with open (ref_t) as f:
+        for line in f:
+            if line.startswith(">"):
+                ref_id = line.split()[0][1:]
+                dict_ref_len[ref_id] = 0
+            else:
+                dict_ref_len[ref_id] += len(line.strip())
+
 
     # If either of the alignment files are not provided (sam files):
     if alignment_genome == '' or alignment_transcriptome == '':
@@ -149,10 +140,10 @@ def main(argv):
 
         # Alignment to reference genome
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference genome\n")
-        call("minimap2 -ax splice " + ref_g + " " + in_fasta + " > " + alignment_genome, shell=True)
+        call("minimap2 -ax splice " + ref_g + " " + infile + " > " + alignment_genome, shell=True)
         # Alignment to reference transcriptome
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
-        call("minimap2 -ax splice " + ref_t + " " + in_fasta + " > " + alignment_transcriptome, shell=True)
+        call("minimap2 -ax splice " + ref_t + " " + infile + " > " + alignment_transcriptome, shell=True)
 
 
     # Read the genome alignments to memory:
@@ -177,7 +168,7 @@ def main(argv):
 
     # Aligned reads analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Aligned reads analysis\n")
-    num_aligned = align.head_align_tail(outfile, num_bins, dict_trx_alignment)
+    num_aligned = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
 
     # Un-aligned reads analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Un-aligned reads analysis\n")
