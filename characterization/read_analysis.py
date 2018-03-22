@@ -169,6 +169,7 @@ def main(argv):
     # Aligned reads analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Aligned reads analysis\n")
     num_aligned = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
+    #num_aligned = head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
 
     # Un-aligned reads analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Un-aligned reads analysis\n")
@@ -183,7 +184,6 @@ def main(argv):
 
     # Length distribution of unaligned reads
     out1 = open(outfile + "_unaligned_length_ecdf", 'w')
-    num_aligned = len(dict_trx_alignment) - num_unaligned
     if num_unaligned != 0:
         max_length = max(unaligned_length)
         hist_unaligned, edges_unaligned = numpy.histogram(unaligned_length, bins=numpy.arange(0, max_length + 50, 50),

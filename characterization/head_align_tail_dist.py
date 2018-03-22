@@ -63,8 +63,12 @@ def parse_cigar(cigar_string):
     tail_info = cigar_string[-1]
     if head_info.type == "S":
         head = head_info.size
+    else:
+        head = 0
     if tail_info.type == "S":
         tail = tail_info.size
+    else:
+        tail = 0
     for item in cigar_string:
         if item.type not in dict_errors:
             dict_errors[item.type] = [item.size]
@@ -87,7 +91,7 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
     dict_align_ratio = {}
     dict_rellen = {}
 
-    dict_errors_allreads = {"S":[], "M":[], "I":[], "D":[]}
+    dict_errors_allreads = {"S":[], "M":[], "I":[], "D":[], "N":[]}
 
     for qname in dict_trx_alignment:
         r = dict_trx_alignment[qname]
@@ -103,7 +107,7 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
             total.append(read_len_total)
             head, tail, error_dict = parse_cigar(r.cigar)
             for key in error_dict:
-                dict_errors_allreads[key].extend[error_dict[key]]
+                dict_errors_allreads[key].extend(error_dict[key])
             middle = read_len_total - head - tail
 
             #ratio aligned part over total length of the read
