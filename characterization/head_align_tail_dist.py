@@ -10,6 +10,7 @@ from __future__ import with_statement
 import sys
 import getopt
 import numpy
+from itertools import groupby
 
 try:
     from six.moves import xrange
@@ -57,8 +58,10 @@ def flex_bins(num_of_bins, ratio_dict, num_of_reads):
 
     return ratio_bins
 
-def parse_cigar(cigar_string):
+def parse_cigar_cs(cigar_string, cs_string):
     dict_errors = {}
+
+    #Process the head and tail info
     head_info = cigar_string[0]
     tail_info = cigar_string[-1]
     if head_info.type == "S":
@@ -69,11 +72,37 @@ def parse_cigar(cigar_string):
         tail = tail_info.size
     else:
         tail = 0
+
+    #Process the insertion and deletion info (it can be done using cs info too)
     for item in cigar_string:
-        if item.type not in dict_errors:
-            dict_errors[item.type] = [item.size]
-        else:
-            dict_errors[item.type].append(item.size)
+        if item.type in ['I', 'D']:
+            if item.type not in dict_errors:
+                dict_errors[item.type] = [item.size]
+            else:
+                dict_errors[item.type].append(item.size)
+
+    #Procees the mismatch cases
+    cs_removed_acgt = cs.translate(None, 'agct')
+    cs_removed_digits = ''.join([i for i in cs_removed_acgt if not i.isdigit()])
+    groups = groupby(cs_removed_digits)
+    cs_grouped = [(label, sum(1 for _ in group)) for label, group in groups]
+    for item in cs_grouped:
+        if item[0] == "*":
+            mismatch_size = item[1]
+            if "X" not in dict_errors:
+                dict_errors["X"] = [mismatch_size]
+            else:
+                dict_errors["X"].append(mismatch_size)
+
+    #Process the match cases
+    cs_onlymatches = cs.translate(None, '+-*agct~')
+    match_cases = cs_onlymatches.split(':')
+    for item in match_cases:
+        if len(item) != 0:
+            if "M" not in dict_errors:
+                dict_errors["M"] = [int(item)]
+            else:
+                dict_errors["M"].append(int(item))
 
     return head, tail, dict_errors
 
@@ -91,7 +120,7 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
     dict_align_ratio = {}
     dict_rellen = {}
 
-    dict_errors_allreads = {"S":[], "M":[], "I":[], "D":[], "N":[]}
+    dict_errors_allreads = {"M":[], "X":[], "I":[], "D":[]}
 
     for qname in dict_trx_alignment:
         r = dict_trx_alignment[qname]
@@ -105,7 +134,7 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
 
             read_len_total = len(r.read.seq)
             total.append(read_len_total)
-            head, tail, error_dict = parse_cigar(r.cigar)
+            head, tail, error_dict = parse_cigar_cs(r.cigar, r.optional_field('cs'))
             for key in error_dict:
                 dict_errors_allreads[key].extend(error_dict[key])
             middle = read_len_total - head - tail
@@ -197,4 +226,4 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
         out4.write("\n")
     out4.close()
 
-    return count_aligned
+    return count_aligned, dict_errors_allreads
