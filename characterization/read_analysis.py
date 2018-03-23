@@ -143,7 +143,7 @@ def main(argv):
         call("minimap2 -ax splice " + ref_g + " " + infile + " > " + alignment_genome, shell=True)
         # Alignment to reference transcriptome
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
-        call("minimap2 -ax splice " + ref_t + " " + infile + " > " + alignment_transcriptome, shell=True)
+        call("minimap2 --cs -ax splice " + ref_t + " " + infile + " > " + alignment_transcriptome, shell=True)
 
 
     # Read the genome alignments to memory:
@@ -168,7 +168,7 @@ def main(argv):
 
     # Aligned reads analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Aligned reads analysis\n")
-    num_aligned = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
+    num_aligned, error_dict = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
     #num_aligned = head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
 
     # Un-aligned reads analysis
@@ -202,7 +202,7 @@ def main(argv):
 
     # MATCH AND ERROR MODELS
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": match and error models\n")
-    error_model.hist(outfile)
+    error_model.hist(outfile, error_dict)
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")
