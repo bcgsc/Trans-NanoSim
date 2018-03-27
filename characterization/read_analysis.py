@@ -168,7 +168,7 @@ def main(argv):
 
     # Aligned reads analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Aligned reads analysis\n")
-    num_aligned, error_dict = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
+    num_aligned = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
     #num_aligned = head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
 
     # Un-aligned reads analysis
@@ -202,7 +202,7 @@ def main(argv):
 
     # MATCH AND ERROR MODELS
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": match and error models\n")
-    error_model.hist(outfile, error_dict)
+    error_model.hist(outfile)
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")

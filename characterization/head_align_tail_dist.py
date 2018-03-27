@@ -58,8 +58,9 @@ def flex_bins(num_of_bins, ratio_dict, num_of_reads):
 
     return ratio_bins
 
-def parse_cigar_cs(cigar_string, cs_string):
-    dict_errors = {}
+#def parse_cigar_cs(cigar_string, cs_string):
+def get_head_tail(cigar_string):
+    #dict_errors = {}
 
     #Process the head and tail info
     head_info = cigar_string[0]
@@ -73,6 +74,7 @@ def parse_cigar_cs(cigar_string, cs_string):
     else:
         tail = 0
 
+    '''
     #Process the insertion and deletion info (it can be done using cs info too)
     for item in cigar_string:
         if item.type in ['I', 'D']:
@@ -104,7 +106,9 @@ def parse_cigar_cs(cigar_string, cs_string):
             else:
                 dict_errors["M"].append(int(item))
 
-    return head, tail, dict_errors
+    return head, tail, dict_errors, list(cs_removed_digits)
+    '''
+    return head, tail
 
 def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
     out1 = open(outfile + '_read_rellen_ecdf', 'w')
@@ -120,7 +124,7 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
     dict_align_ratio = {}
     dict_rellen = {}
 
-    dict_errors_allreads = {"M":[], "X":[], "I":[], "D":[]}
+    #dict_errors_allreads = {"M":[], "X":[], "I":[], "D":[]}
 
     for qname in dict_trx_alignment:
         r = dict_trx_alignment[qname]
@@ -134,9 +138,9 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
 
             read_len_total = len(r.read.seq)
             total.append(read_len_total)
-            head, tail, error_dict = parse_cigar_cs(r.cigar, r.optional_field('cs'))
-            for key in error_dict:
-                dict_errors_allreads[key].extend(error_dict[key])
+            head, tail = get_head_tail(r.cigar)
+            #for key in error_dict:
+                #dict_errors_allreads[key].extend(error_dict[key])
             middle = read_len_total - head - tail
 
             #ratio aligned part over total length of the read
@@ -226,4 +230,4 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
         out4.write("\n")
     out4.close()
 
-    return count_aligned, dict_errors_allreads
+    return count_aligned
