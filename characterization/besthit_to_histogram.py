@@ -4,7 +4,6 @@ from __future__ import with_statement
 import numpy
 import HTSeq
 import re
-from itertools import groupby
 
 try:
     from six.moves import xrange
@@ -34,61 +33,25 @@ def add_match(prev, succ, match_list):
 
     match_list[prev][succ] += 1
 
-def parse_cigar_cs(cigar_string, cs_string):
-
-    dict_match_error = {}
-
-    #Process the insertion and deletion info (it can be done using cs info too)
-    for item in cigar_string:
-        if item.type in ['I', 'D']:
-            if item.type not in dict_match_error:
-                dict_match_error[item.type] = [item.size]
-            else:
-                dict_match_error[item.type].append(item.size)
-
-    #Procees the mismatch cases
-    cs_removed_acgt = cs_string.translate(None, 'agct')
-    cs_removed_digits = ''.join([i for i in cs_removed_acgt if not i.isdigit()])
-    groups = groupby(cs_removed_digits)
-    cs_grouped = [(label, sum(1 for _ in group)) for label, group in groups]
-    for item in cs_grouped:
-        if item[0] == "*":
-            mismatch_size = item[1]
-            if "X" not in dict_match_error:
-                dict_match_error["X"] = [mismatch_size]
-            else:
-                dict_match_error["X"].append(mismatch_size)
-
-    #Process the match cases
-    cs_onlymatches = cs_string.translate(None, '+-*agct~')
-    match_cases = cs_onlymatches.split(':')
-    for item in match_cases:
-        if len(item) != 0:
-            if "M" not in dict_match_error:
-                dict_match_error["M"] = [int(item)]
-            else:
-                dict_match_error["M"].append(int(item))
-
-    return dict_match_error, list(cs_removed_digits)
-
 def parse_cs(cs_string):
     mis = 0
     list_op = []
-    d = {":": [], "+": [], "-": [], "*": []}
+    d = {"match": [], "ins": [], "del": [], "mis": []}
     for item in re.findall('(:[0-9]+|\*[a-z][a-z]|[=\+\-][A-Za-z]+)', cs_string):
         op = item[0]
+        op_name = conv_op_to_word(op)
         list_op.append(op)
-        if op == "+" or op == "-":
+        if op_name == "ins" or op_name == "del":
             if mis != 0:
-                d['*'].append(mis)
+                d['mis'].append(mis)
                 mis = 0
-            d[op].append(len(item) - 1)
-        elif op == ":":
+            d[op_name].append(len(item) - 1)
+        elif op_name == "match":
             if mis != 0:
-                d['*'].append(mis)
+                d['mis'].append(mis)
                 mis = 0
-            d[op].append(int(item[1:]))
-        elif op == "*":
+            d[op_name].append(int(item[1:]))
+        elif op_name == "mis":
             mis += 1
     return d, list_op
 
@@ -104,11 +67,13 @@ def conv_op_to_word(op):
     else:
         return "skip"
 
-def hist(outfile, dict_trx_alignment):
+def hist(outfile, dict_alm):
+
     out_match = open(outfile + "_match.hist", 'w')
     out_mis = open(outfile + "_mis.hist", 'w')
     out_ins = open(outfile + "_ins.hist", 'w')
     out_del = open(outfile + "_del.hist", 'w')
+
     #out1 = open(outfile + "_error_markov_model", 'w')
     #out2 = open(outfile + "_match_markov_model", 'w')
     #out3 = open(outfile + "_first_match.hist", 'w')
@@ -125,38 +90,23 @@ def hist(outfile, dict_trx_alignment):
                   "del0/mis": 0, "del0/ins": 0, "del0/del": 0, "ins0/mis": 0, "ins0/ins": 0, "ins0/del": 0}
     first_error = {"mis": 0, "ins": 0, "del": 0}
 
-    for qname in dict_trx_alignment:
-        r = dict_trx_alignment[qname]
+    for qname in dict_alm:
+        r = dict_alm[qname]
         if r.aligned:
-            #dict_match_error, list_op = parse_cigar_cs(r.cigar, r.optional_field('cs'))
+
             dict_match_error, list_op = parse_cs(r.optional_field('cs'))
 
-            '''
-            if "M" in dict_match_error:
-                for item in dict_match_error["M"]:
+            if "match" in dict_match_error:
+                for item in dict_match_error["match"]:
                     add_dict(item, dic_match)
-            if "X" in dict_match_error:
-                for item in dict_match_error["X"]:
+            if "mis" in dict_match_error:
+                for item in dict_match_error["mis"]:
                     add_dict(item, dic_mis)
-            if "I" in dict_match_error:
-                for item in dict_match_error["I"]:
+            if "ins" in dict_match_error:
+                for item in dict_match_error["ins"]:
                     add_dict(item, dic_ins)
-            if "D" in dict_match_error:
-                for item in dict_match_error["D"]:
-                    add_dict(item, dic_del)
-            '''
-
-            if ":" in dict_match_error:
-                for item in dict_match_error[":"]:
-                    add_dict(item, dic_match)
-            if "*" in dict_match_error:
-                for item in dict_match_error["*"]:
-                    add_dict(item, dic_mis)
-            if "+" in dict_match_error:
-                for item in dict_match_error["+"]:
-                    add_dict(item, dic_ins)
-            if "-" in dict_match_error:
-                for item in dict_match_error["-"]:
+            if "del" in dict_match_error:
+                for item in dict_match_error["del"]:
                     add_dict(item, dic_del)
             '''
             flag = True
@@ -317,22 +267,22 @@ def hist(outfile, dict_trx_alignment):
                     mismatch += 1
     '''
     # write the histogram for other matches and errors:
-    #out_match.write("number of bases\tMatches:\n")
+    out_match.write("number of bases\tMatches:\n")
     for key in dic_match:
         out_match.write(str(key) + "\t" + str(dic_match[key]) + "\n")
     out_match.close()
 
-    #out_mis.write("number of bases\tMismatches:\n")
+    out_mis.write("number of bases\tMismatches:\n")
     for key in dic_mis:
         out_mis.write(str(key) + "\t" + str(dic_mis[key]) + "\n")
     out_mis.close()
 
-    #out_ins.write("number of bases\tInsertions:\n")
+    out_ins.write("number of bases\tInsertions:\n")
     for key in dic_ins:
         out_ins.write(str(key) + "\t" + str(dic_ins[key]) + "\n")
     out_ins.close()
 
-    #out_del.write("number of bases\tDeletions:\n")
+    out_del.write("number of bases\tDeletions:\n")
     for key in dic_del:
         out_del.write(str(key) + "\t" + str(dic_del[key]) + "\n")
     out_del.close()
