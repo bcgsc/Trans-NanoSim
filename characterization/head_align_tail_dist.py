@@ -10,7 +10,6 @@ from __future__ import with_statement
 import sys
 import getopt
 import numpy
-from itertools import groupby
 
 try:
     from six.moves import xrange
@@ -58,9 +57,7 @@ def flex_bins(num_of_bins, ratio_dict, num_of_reads):
 
     return ratio_bins
 
-#def parse_cigar_cs(cigar_string, cs_string):
 def get_head_tail(cigar_string):
-    #dict_errors = {}
 
     #Process the head and tail info
     head_info = cigar_string[0]
@@ -74,40 +71,6 @@ def get_head_tail(cigar_string):
     else:
         tail = 0
 
-    '''
-    #Process the insertion and deletion info (it can be done using cs info too)
-    for item in cigar_string:
-        if item.type in ['I', 'D']:
-            if item.type not in dict_errors:
-                dict_errors[item.type] = [item.size]
-            else:
-                dict_errors[item.type].append(item.size)
-
-    #Procees the mismatch cases
-    cs_removed_acgt = cs.translate(None, 'agct')
-    cs_removed_digits = ''.join([i for i in cs_removed_acgt if not i.isdigit()])
-    groups = groupby(cs_removed_digits)
-    cs_grouped = [(label, sum(1 for _ in group)) for label, group in groups]
-    for item in cs_grouped:
-        if item[0] == "*":
-            mismatch_size = item[1]
-            if "X" not in dict_errors:
-                dict_errors["X"] = [mismatch_size]
-            else:
-                dict_errors["X"].append(mismatch_size)
-
-    #Process the match cases
-    cs_onlymatches = cs.translate(None, '+-*agct~')
-    match_cases = cs_onlymatches.split(':')
-    for item in match_cases:
-        if len(item) != 0:
-            if "M" not in dict_errors:
-                dict_errors["M"] = [int(item)]
-            else:
-                dict_errors["M"].append(int(item))
-
-    return head, tail, dict_errors, list(cs_removed_digits)
-    '''
     return head, tail
 
 def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
