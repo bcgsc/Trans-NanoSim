@@ -55,6 +55,66 @@ def parse_cs(cs_string):
             mis += 1
     return d, list_op
 
+def parseint(str):
+    return int(''.join([x for x in string if x.isdigit()]))
+
+def get_cs(cigar_str, md_str):
+    cs = []
+    k = 0
+    cx = 0
+    cy = 0
+    mx = 0
+    my = 0
+    md = re.findall('(\\d+)|(\\^[A-Za-z]+)|([A-Za-z])', md_str)
+    cigar = re.findall('(\d+)([MIDSHNX=])' , cigar_str)
+    for m in md:
+        if m[2] != "":
+            l = len(m[2]) - 1
+            cs.extend(["-", m[2][1:]])
+            mx += l
+            cx += l
+            k += 1
+        else:
+            if m[1] != "":
+                ml = parseint(m[1])
+            else:
+                ml = 1
+            while (k < len(cigar) and cigar[k][1] != 'D'):
+                cl = int(cigar[k][0])
+                op = cigar[k][1]
+                if op == "M":
+                    if (my + ml < cy + cl):
+                        if ml > 0:
+                            if (m[3] != null):
+                                cs.extend(['*', 'a', 'b'])
+                            else:
+                                cs.extend([':', ml])
+                        mx += ml
+                        my += ml
+                        ml = 0
+                        break
+                    else:
+                        dl = cy + cl - my
+                        cs.extend([':', dl])
+                        cx += cl
+                        cy += cl
+                        k += 1
+                        mx += dl
+                        my += dl
+                        ml -= dl
+
+                elif op == 'I':
+                    cs.extend(['+', 'I' * cl])
+                    cy += cl
+                    my += cl
+                    k += 1
+                elif op == 'S':
+                    cy += cl
+                    my += cl
+                    k += 1
+
+    return "".join(cs)
+
 def conv_op_to_word(op):
     if op == ":":
         return "match"
