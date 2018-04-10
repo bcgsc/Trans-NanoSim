@@ -4,6 +4,7 @@ from __future__ import with_statement
 import numpy
 import HTSeq
 import re
+import itertools
 
 try:
     from six.moves import xrange
@@ -33,7 +34,7 @@ def add_match(prev, succ, match_list):
 
     match_list[prev][succ] += 1
 
-def parse_cs(cs_string):
+def parse_cs_test(cs_string):
     mis = 0
     list_op = []
     d = {"match": [], "ins": [], "del": [], "mis": []}
@@ -53,7 +54,31 @@ def parse_cs(cs_string):
             d[op_name].append(int(item[1:]))
         elif op_name == "mis":
             mis += 1
-    return d, list_op
+    list_op_unique = [key for key, grp in itertools.groupby(list_op)]
+    return d, list_op, list_op_unique
+
+def parse_cs(cs_string):
+    mis = 0
+    list_op = []
+    list_hist = []
+    for item in re.findall('(:[0-9]+|\*[a-z][a-z]|[=\+\-][A-Za-z]+)', cs_string):
+        op = item[0]
+        op_name = conv_op_to_word(op)
+        list_op.append(op)
+        if op_name == "ins" or op_name == "del":
+            if mis != 0:
+                list_hist.append(mis)
+                mis = 0
+            list_hist.append(len(item) - 1)
+        elif op_name == "match":
+            if mis != 0:
+                list_hist.append(mis)
+                mis = 0
+            list_hist.append(int(item[1:]))
+        elif op_name == "mis":
+            mis += 1
+    list_op_unique = [key for key, grp in itertools.groupby(list_op)]
+    return list_hist, list_op_unique
 
 def parseint(str):
     return int(''.join([x for x in string if x.isdigit()]))
@@ -135,9 +160,9 @@ def hist(outfile, dict_alm):
     out_ins = open(outfile + "_ins.hist", 'w')
     out_del = open(outfile + "_del.hist", 'w')
 
-    #out1 = open(outfile + "_error_markov_model", 'w')
-    #out2 = open(outfile + "_match_markov_model", 'w')
-    #out3 = open(outfile + "_first_match.hist", 'w')
+    out1 = open(outfile + "_error_markov_model", 'w')
+    out2 = open(outfile + "_match_markov_model", 'w')
+    out3 = open(outfile + "_first_match.hist", 'w')
 
     dic_match = {}
     dic_first_match = {}
@@ -152,36 +177,35 @@ def hist(outfile, dict_alm):
     first_error = {"mis": 0, "ins": 0, "del": 0}
 
     for qname in dict_alm:
-        r = dict_alm[qname]
-        if r.aligned:
+        alnm = dict_alm[qname]
+        if alnm.aligned:
 
-            dict_match_error, list_op = parse_cs(r.optional_field('cs'))
+            list_hist, list_op_unique = parse_cs(alnm.optional_field('cs'))
 
-            if "match" in dict_match_error:
-                for item in dict_match_error["match"]:
-                    add_dict(item, dic_match)
-            if "mis" in dict_match_error:
-                for item in dict_match_error["mis"]:
-                    add_dict(item, dic_mis)
-            if "ins" in dict_match_error:
-                for item in dict_match_error["ins"]:
-                    add_dict(item, dic_ins)
-            if "del" in dict_match_error:
-                for item in dict_match_error["del"]:
-                    add_dict(item, dic_del)
-            '''
             flag = True
-            for i in range (0, len(list_op)):
-                curr_op = conv_op_to_word(list_op[i])
-                if curr_op != "match" and curr_op != "skip":
-                    if flag:
-                        flag = False
-                        prev_error = curr_op + "0"
-                        first_error[curr_op] += 1
+            for i in range (0, len(list_op_unique)):
+                curr_op = conv_op_to_word(list_op_unique[i])
+                if curr_op != "skip":
+                    if curr_op != "match":
+                        if flag:
+                            flag = False
+                            prev_error = curr_op + "0"
+                            first_error[curr_op] += 1
+                        else:
+                            error_list[prev_error + "/" + curr_op] += 1
+                            prev_error = curr_op
+                        if curr_op == "mis":
+                            add_dict(list_erros_and_matchs[i], dic_mis)
+                        elif curr_op == "del":
+                            add_dict(list_erros_and_matchs[i], dic_del)
+                        elif curr_op == "ins":
+                            add_dict(list_erros_and_matchs[i], dic_ins)
                     else:
-                        error_list[prev_error + "/" + curr_op] += 1
-                        prev_error = curr_op
-            '''
+                        #if flag:
+                            #add_dict(list_erros_and_matchs[i], dic_first_match)
+                        #else:
+                        add_dict(list_erros_and_matchs[i], dic_match)
+
 
     '''
     for x in xrange(0, 150):
@@ -328,22 +352,22 @@ def hist(outfile, dict_alm):
                     mismatch += 1
     '''
     # write the histogram for other matches and errors:
-    out_match.write("number of bases\tMatches:\n")
+    #out_match.write("number of bases\tMatches:\n")
     for key in dic_match:
         out_match.write(str(key) + "\t" + str(dic_match[key]) + "\n")
     out_match.close()
 
-    out_mis.write("number of bases\tMismatches:\n")
+    #out_mis.write("number of bases\tMismatches:\n")
     for key in dic_mis:
         out_mis.write(str(key) + "\t" + str(dic_mis[key]) + "\n")
     out_mis.close()
 
-    out_ins.write("number of bases\tInsertions:\n")
+    #out_ins.write("number of bases\tInsertions:\n")
     for key in dic_ins:
         out_ins.write(str(key) + "\t" + str(dic_ins[key]) + "\n")
     out_ins.close()
 
-    out_del.write("number of bases\tDeletions:\n")
+    #out_del.write("number of bases\tDeletions:\n")
     for key in dic_del:
         out_del.write(str(key) + "\t" + str(dic_del[key]) + "\n")
     out_del.close()
