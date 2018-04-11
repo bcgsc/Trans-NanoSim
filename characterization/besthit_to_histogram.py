@@ -208,7 +208,6 @@ def hist(outfile, dict_alm):
                             add_dict(list_hist[i], dic_del)
                         elif curr_op == "ins":
                             add_dict(list_hist[i], dic_ins)
-
                     else:
                         c += 1
                         match = list_hist[i]
