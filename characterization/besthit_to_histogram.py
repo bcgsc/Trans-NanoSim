@@ -180,13 +180,16 @@ def hist(outfile, dict_alm):
         alnm = dict_alm[qname]
         if alnm.aligned:
 
+            #if cs tag is provided, continue, else calculate it from MD and cigar first.
             list_hist, list_op_unique = parse_cs(alnm.optional_field('cs'))
 
             flag = True
+            c = 0
             for i in range (0, len(list_op_unique)):
                 curr_op = conv_op_to_word(list_op_unique[i])
                 if curr_op != "skip":
                     if curr_op != "match":
+                        exact_prev_op = conv_op_to_word(list_op_unique[i - 1])
                         if flag:
                             flag = False
                             prev_error = curr_op + "0"
@@ -194,18 +197,31 @@ def hist(outfile, dict_alm):
                         else:
                             error_list[prev_error + "/" + curr_op] += 1
                             prev_error = curr_op
-                        if curr_op == "mis":
-                            add_dict(list_erros_and_matchs[i], dic_mis)
-                        elif curr_op == "del":
-                            add_dict(list_erros_and_matchs[i], dic_del)
-                        elif curr_op == "ins":
-                            add_dict(list_erros_and_matchs[i], dic_ins)
-                    else:
-                        #if flag:
-                            #add_dict(list_erros_and_matchs[i], dic_first_match)
-                        #else:
-                        add_dict(list_erros_and_matchs[i], dic_match)
 
+                        if curr_op == "mis":
+                            add_dict(list_hist[i], dic_mis)
+                            if exact_prev_op != "match":
+                                add_dict(0, dic_match)
+                                add_match(prev_match, 0, match_list)
+                                prev_match = 0
+                        elif curr_op == "del":
+                            add_dict(list_hist[i], dic_del)
+                        elif curr_op == "ins":
+                            add_dict(list_hist[i], dic_ins)
+
+                    else:
+                        c += 1
+                        match = list_hist[i]
+                        if flag:
+                            add_dict(match, dic_first_match)
+                            prev_match = match
+                        else:
+                            if i == len(list_op_unique) - 1:
+                                add_match(prev_match, match, match_list)
+                            else:
+                                add_dict(match, dic_match)
+                                add_match(prev_match, match, match_list)
+                                prev_match = match
 
     '''
     for x in xrange(0, 150):
@@ -351,28 +367,29 @@ def hist(outfile, dict_alm):
                         prev_error = "del0"
                     mismatch += 1
     '''
-    # write the histogram for other matches and errors:
-    #out_match.write("number of bases\tMatches:\n")
+
+    # write the histogram for matches and errors:
+    out_match.write("number of bases\tMatches:\n")
     for key in dic_match:
         out_match.write(str(key) + "\t" + str(dic_match[key]) + "\n")
     out_match.close()
 
-    #out_mis.write("number of bases\tMismatches:\n")
+    out_mis.write("number of bases\tMismatches:\n")
     for key in dic_mis:
         out_mis.write(str(key) + "\t" + str(dic_mis[key]) + "\n")
     out_mis.close()
 
-    #out_ins.write("number of bases\tInsertions:\n")
+    out_ins.write("number of bases\tInsertions:\n")
     for key in dic_ins:
         out_ins.write(str(key) + "\t" + str(dic_ins[key]) + "\n")
     out_ins.close()
 
-    #out_del.write("number of bases\tDeletions:\n")
+    out_del.write("number of bases\tDeletions:\n")
     for key in dic_del:
         out_del.write(str(key) + "\t" + str(dic_del[key]) + "\n")
     out_del.close()
 
-    '''
+
     predecessor = {"mis": error_list["mis/mis"] + error_list["mis/ins"] + error_list["mis/del"],
                    "ins": error_list["ins/mis"] + error_list["ins/ins"] + error_list["ins/del"],
                    "del": error_list["del/mis"] + error_list["del/ins"] + error_list["del/del"],
@@ -455,4 +472,3 @@ def hist(outfile, dict_alm):
         out3.write(str(i) + "-" + str(i + 1) + "\t" + str(count_prob) + '\n')
 
     out3.close()
-    '''
