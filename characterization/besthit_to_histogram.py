@@ -190,13 +190,15 @@ def hist(outfile, dict_alm):
                 if curr_op != "skip":
                     if curr_op != "match":
                         exact_prev_op = conv_op_to_word(list_op_unique[i - 1])
+                        if exact_prev_op != "match":
+                            prev_error += "0"
                         if flag:
                             flag = False
-                            prev_error = curr_op + "0"
                             first_error[curr_op] += 1
                         else:
                             error_list[prev_error + "/" + curr_op] += 1
-                            prev_error = curr_op
+
+                        prev_error = curr_op
 
                         if curr_op == "mis":
                             add_dict(list_hist[i], dic_mis)
@@ -221,151 +223,6 @@ def hist(outfile, dict_alm):
                                 add_dict(match, dic_match)
                                 add_match(prev_match, match, match_list)
                                 prev_match = match
-
-    '''
-    for x in xrange(0, 150):
-        dic_match[x] = 0
-        match_list[x] = {}
-        for y in xrange(0, 150):
-            match_list[x][y] = 0
-        for key in match_bin.keys():
-            match_bin[key][x] = 0
-    for x in xrange(0, 150):
-        dic_first_match[x] = 0
-
-    for x in xrange(0, 30):
-        dic_mis[x] = 0
-        dic_ins[x] = 0
-        dic_del[x] = 0
-    
-    with open(outfile + "_besthit.maf", 'r') as f:
-        for line in f:
-            prev_match = 0
-            prev_error = ""
-            flag = True
-            new = line.strip().split()
-            ref = new[6]
-            new_line = next(f)
-            new = new_line.strip().split()
-            query = new[6]
-            match = 0
-            mismatch = 0
-            ins = 0
-            dele = 0
-            for i in xrange(0, len(ref)):
-                if ref[i] == query[i]:
-                    if mismatch != 0:
-                        add_dict(mismatch, dic_mis)
-                        mismatch = 0
-                        if flag:
-                            flag = False
-                            first_error["mis"] += 1
-                        else:
-                            error_list[prev_error + "/" + "mis"] += 1
-                        prev_error = "mis"
-                    elif ins != 0:
-                        add_dict(ins, dic_ins)
-                        ins = 0
-                        if flag:
-                            flag = False
-                            first_error["ins"] += 1
-                        else:
-                            error_list[prev_error + "/" + "ins"] += 1
-                        prev_error = "ins"
-                    elif dele != 0:
-                        add_dict(dele, dic_del)
-                        dele = 0
-                        if flag:
-                            flag = False
-                            first_error["del"] += 1
-                        else:
-                            error_list[prev_error + "/" + "del"] += 1
-                        prev_error = "del"
-                    match += 1
-                    if i == len(ref) - 1 and match != 0:
-                        add_match(prev_match, match, match_list)
-                elif ref[i] == '-':
-                    if match != 0:
-                        if flag:
-                            add_dict(match, dic_first_match)
-                            prev_match = match
-                        else:
-                            add_dict(match, dic_match)
-                            add_match(prev_match, match, match_list)
-                            prev_match = match
-                        match = 0
-                    elif mismatch != 0:
-                        add_dict(mismatch, dic_mis)
-                        dic_match[0] += 1
-                        add_match(prev_match, 0, match_list)
-                        prev_match = 0
-                        mismatch = 0
-                        if flag:
-                            flag = False
-                            first_error["mis"] += 1
-                        else:
-                            error_list[prev_error + "/" + "mis"] += 1
-                        prev_error = "mis0"
-                    ins += 1
-                elif query[i] == '-':
-                    if match != 0:
-                        if flag:
-                            add_dict(match, dic_first_match)
-                            prev_match = match
-                        else:
-                            add_dict(match, dic_match)
-                            add_match(prev_match, match, match_list)
-                            prev_match = match
-                        match = 0
-                    elif mismatch != 0:
-                        add_dict(mismatch, dic_mis)
-                        dic_match[0] += 1
-                        add_match(prev_match, 0, match_list)
-                        prev_match = 0
-                        mismatch = 0
-                        if flag:
-                            flag = False
-                            first_error["mis"] += 1
-                        else:
-                            error_list[prev_error + "/" + "mis"] += 1
-                        prev_error = "mis0"
-                    dele += 1
-                else:
-                    if match != 0:
-                        if flag:
-                            add_dict(match, dic_first_match)
-                            prev_match = match
-                        else:
-                            add_dict(match, dic_match)
-                            add_match(prev_match, match, match_list)
-                            prev_match = match
-                        match = 0
-                    elif ins != 0:
-                        add_dict(ins, dic_ins)
-                        add_dict(match, dic_match)
-                        add_match(prev_match, 0, match_list)
-                        prev_match = 0
-                        ins = 0
-                        if flag:
-                            flag = False
-                            first_error["ins"] += 1
-                        else:
-                            error_list[prev_error + "/" + "ins"] += 1
-                        prev_error = "ins0"
-                    elif dele != 0:
-                        add_dict(dele, dic_del)
-                        add_dict(match, dic_match)
-                        add_match(prev_match, 0, match_list)
-                        prev_match = 0
-                        dele = 0
-                        if flag:
-                            flag = False
-                            first_error["del"] += 1
-                        else:
-                            error_list[prev_error + "/" + "del"] += 1
-                        prev_error = "del0"
-                    mismatch += 1
-    '''
 
     # write the histogram for matches and errors:
     out_match.write("number of bases\tMatches:\n")
