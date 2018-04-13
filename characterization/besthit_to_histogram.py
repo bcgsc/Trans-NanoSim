@@ -34,29 +34,6 @@ def add_match(prev, succ, match_list):
 
     match_list[prev][succ] += 1
 
-def parse_cs_test(cs_string):
-    mis = 0
-    list_op = []
-    d = {"match": [], "ins": [], "del": [], "mis": []}
-    for item in re.findall('(:[0-9]+|\*[a-z][a-z]|[=\+\-][A-Za-z]+)', cs_string):
-        op = item[0]
-        op_name = conv_op_to_word(op)
-        list_op.append(op)
-        if op_name == "ins" or op_name == "del":
-            if mis != 0:
-                d['mis'].append(mis)
-                mis = 0
-            d[op_name].append(len(item) - 1)
-        elif op_name == "match":
-            if mis != 0:
-                d['mis'].append(mis)
-                mis = 0
-            d[op_name].append(int(item[1:]))
-        elif op_name == "mis":
-            mis += 1
-    list_op_unique = [key for key, grp in itertools.groupby(list_op)]
-    return d, list_op, list_op_unique
-
 def parse_cs(cs_string):
     mis = 0
     list_op = []
@@ -79,9 +56,6 @@ def parse_cs(cs_string):
             mis += 1
     list_op_unique = [key for key, grp in itertools.groupby(list_op)]
     return list_hist, list_op_unique
-
-def parseint(str):
-    return int(''.join([x for x in string if x.isdigit()]))
 
 def get_cs(cigar_str, md_str):
     cs = []
@@ -181,10 +155,13 @@ def hist(outfile, dict_alm):
         if alnm.aligned:
 
             #if cs tag is provided, continue, else calculate it from MD and cigar first.
-            list_hist, list_op_unique = parse_cs(alnm.optional_field('cs'))
+            try:
+                list_hist, list_op_unique = parse_cs(alnm.optional_field('cs'))
+            except:
+                cs_string = get_cs(alnm.cigar, alnm.optional_field('MD'))
+                list_hist, list_op_unique = parse_cs(cs_string)
 
             flag = True
-            c = 0
             for i in range (0, len(list_op_unique)):
                 curr_op = conv_op_to_word(list_op_unique[i])
                 if curr_op != "skip":
@@ -211,7 +188,6 @@ def hist(outfile, dict_alm):
                         elif curr_op == "ins":
                             add_dict(list_hist[i], dic_ins)
                     else:
-                        c += 1
                         match = list_hist[i]
                         if flag:
                             add_dict(match, dic_first_match)
