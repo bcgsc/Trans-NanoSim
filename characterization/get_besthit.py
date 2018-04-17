@@ -7,6 +7,7 @@ def besthit_and_unaligned(infile, outmaf, outfile):
     align_dict = {}
     out1 = open(outfile + "_besthit.maf", 'w')
     unaligned_dict = {}
+    dict_trx_alignment = {}
 
     with open(outmaf, 'r') as f:
         for line in f:
@@ -28,6 +29,7 @@ def besthit_and_unaligned(infile, outmaf, outfile):
             if align_dict[name][0] == length and not align_dict[name][2]:
                 out1.write(ref + query)
                 align_dict[name][2] = True
+                dict_trx_alignment[name] = [ref, query]
 
     with open(infile, 'r') as f2:
         for line in f2:
@@ -42,4 +44,4 @@ def besthit_and_unaligned(infile, outmaf, outfile):
                     unaligned_dict[last_name] = len(line.strip())
 
     out1.close()
-    return unaligned_dict.values()
+    return unaligned_dict.values(), dict_trx_alignment
