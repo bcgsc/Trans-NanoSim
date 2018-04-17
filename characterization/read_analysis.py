@@ -140,7 +140,7 @@ def main(argv):
 
         # Alignment to reference genome
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference genome\n")
-        call("minimap2 -ax splice " + ref_g + " " + infile + " > " + alignment_genome, shell=True)
+        call("minimap2 --MD -ax map-ont " + ref_g + " " + infile + " > " + alignment_genome, shell=True)
         # Alignment to reference transcriptome
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
         call("minimap2 --cs -ax splice " + ref_t + " " + infile + " > " + alignment_transcriptome, shell=True)
@@ -202,7 +202,7 @@ def main(argv):
 
     # MATCH AND ERROR MODELS
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": match and error models\n")
-    error_model.hist(outfile)
+    error_model.hist(outfile, dict_trx_alignment)
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")
