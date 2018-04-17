@@ -166,38 +166,10 @@ def main(argv):
         if qname not in dict_trx_alignment:
             dict_trx_alignment[qname] = read #Read the primary alignment only (ignores the secondary and supp alignments)
 
-    # Aligned reads analysis
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Aligned reads analysis\n")
-    num_aligned = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
+    # Reads length distribution analysis
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reads length distribution analysis\n")
+    num_aligned, num_unaligned, unaligned_length = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len, alnm_ftype)
     #num_aligned = head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
-
-    # Un-aligned reads analysis
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Un-aligned reads analysis\n")
-
-    unaligned_length = []
-    num_unaligned = 0
-    for qname in dict_trx_alignment:
-        t_read = dict_trx_alignment[qname]
-        if not t_read.aligned:
-            num_unaligned += 1
-            unaligned_length.append(len(t_read.read.seq))
-
-    # Length distribution of unaligned reads
-    out1 = open(outfile + "_unaligned_length_ecdf", 'w')
-    if num_unaligned != 0:
-        max_length = max(unaligned_length)
-        hist_unaligned, edges_unaligned = numpy.histogram(unaligned_length, bins=numpy.arange(0, max_length + 50, 50),
-                                                          density=True)
-        cdf = numpy.cumsum(hist_unaligned * 50)
-        out1.write("Aligned / Unaligned ratio:" + "\t" + str(num_aligned * 1.0 / num_unaligned) + '\n')
-        out1.write("bin\t0-" + str(max_length) + '\n')
-        for i in xrange(len(cdf)):
-            out1.write(str(edges_unaligned[i]) + '-' + str(edges_unaligned[i+1]) + "\t" + str(cdf[i]) + '\n')
-    else:
-        out1.write("Aligned / Unaligned ratio:\t100%\n")
-
-    out1.close()
-    del unaligned_length
 
 
     # MATCH AND ERROR MODELS

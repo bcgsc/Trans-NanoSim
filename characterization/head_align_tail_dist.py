@@ -73,61 +73,111 @@ def get_head_tail(cigar_string):
 
     return head, tail
 
-def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
+def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len, alnm_ftype):
     out1 = open(outfile + '_read_rellen_ecdf', 'w')
     out2 = open(outfile + '_read_totallen_ecdf', 'w')
     out3 = open(outfile + '_ht_ratio', 'w')
     out4 = open(outfile + "_align_ratio", 'w')
+    out5 = open(outfile + "_unaligned_length_ecdf", "w")
 
+    aligned = [] # we do not need this in TransNanoSim but I am just including for test.
     total = []
     list_ref_len = []
+    unaligned_length = []
     count_aligned = 0
+    count_unaligned = 0
 
     dict_ht_ratio = {}
     dict_align_ratio = {}
     dict_rellen = {}
 
-    #dict_errors_allreads = {"M":[], "X":[], "I":[], "D":[]}
+    if alnm_ftype == "SAM":
+        for qname in dict_trx_alignment:
+            r = dict_trx_alignment[qname]
+            if r.aligned:
+                count_aligned += 1
 
-    for qname in dict_trx_alignment:
-        r = dict_trx_alignment[qname]
-        if r.aligned:
+                ref = r.iv.chrom
+                ref_len = dict_ref_len[ref]
+                ref_aligned = r.iv.length
+                aligned.append(ref_aligned) #not sure about this. test it.
 
-            count_aligned += 1
+                read_len_total = len(r.read.seq)
+                total.append(read_len_total)
+                head, tail = get_head_tail(r.cigar)
+                #for key in error_dict:
+                    #dict_errors_allreads[key].extend(error_dict[key])
+                middle = read_len_total - head - tail
 
-            ref = r.iv.chrom
-            ref_len = dict_ref_len[ref]
-            ref_aligned = r.iv.length
+                #ratio aligned part over total length of the read
+                alignment_ratio = float(middle) / read_len_total
+                if middle not in dict_align_ratio:
+                    dict_align_ratio[middle] = [alignment_ratio]
+                else:
+                    dict_align_ratio[middle].append(alignment_ratio)
 
-            read_len_total = len(r.read.seq)
-            total.append(read_len_total)
-            head, tail = get_head_tail(r.cigar)
-            #for key in error_dict:
-                #dict_errors_allreads[key].extend(error_dict[key])
-            middle = read_len_total - head - tail
+                head_and_tail = head + tail
+                if head != 0:
+                    ht_ratio = float(head) / head_and_tail
+                    if head_and_tail not in dict_ht_ratio:
+                        dict_ht_ratio[head_and_tail] = [ht_ratio]
+                    else:
+                        dict_ht_ratio[head_and_tail].append(ht_ratio)
 
-            #ratio aligned part over total length of the read
-            alignment_ratio = float(middle) / read_len_total
-            if middle not in dict_align_ratio:
-                dict_align_ratio[middle] = [alignment_ratio]
+                #relative_length : total len of read over total len of reference transcriptome
+                relative_length = float(read_len_total) / ref_len
+                if ref_len not in dict_rellen:
+                    dict_rellen[ref_len] = [relative_length]
+                else:
+                    dict_rellen[ref_len].append(relative_length)
+
             else:
-                dict_align_ratio[middle].append(alignment_ratio)
+                count_unaligned += 1
+                unaligned_length.append(len(r.read.seq))
+    else:
+        #follow the nanosim approach to calculate the length distributions.
+        for qname in dict_trx_alignment:
+            ref_line = dict_trx_alignment[qname][0]
+            query_line = dict_trx_alignment[qname][1]
 
-            head_and_tail = head + tail
+            ref = ref_line.strip().split()
+            aligned_ref = int(ref[3])
+            aligned.append(aligned_ref)
+
+            query = query_line.strip().split()
+            head = int(query[2])
+            middle = int(query[3])
+            tail = int(query[5]) - int(query[2]) - int(query[3])
+            total.append(int(query[5]))
+            head_and_tail = int(query[5]) - int(query[3])
+            alignment_ratio = float(query[3]) / float(query[5])
+            if middle in dict_align_ratio:
+                dict_align_ratio[middle].append(alignment_ratio)
+            else:
+                dict_align_ratio[middle] = [alignment_ratio]
             if head != 0:
                 ht_ratio = float(head) / head_and_tail
-                if head_and_tail not in dict_ht_ratio:
-                    dict_ht_ratio[head_and_tail] = [ht_ratio]
-                else:
+                if head_and_tail in dict_ht_ratio:
                     dict_ht_ratio[head_and_tail].append(ht_ratio)
+                else:
+                    dict_ht_ratio[head_and_tail] = [ht_ratio]
 
-            #relative_length : total len of read over total len of reference transcriptome
-            relative_length = float(read_len_total) / ref_len
-            if ref_len not in dict_rellen:
-                dict_rellen[ref_len] = [relative_length]
-            else:
-                dict_rellen[ref_len].append(relative_length)
 
+    # Length distribution of unaligned reads
+    if count_unaligned != 0:
+        max_length = max(unaligned_length)
+        hist_unaligned, edges_unaligned = numpy.histogram(unaligned_length, bins=numpy.arange(0, max_length + 50, 50),
+                                                          density=True)
+        cdf = numpy.cumsum(hist_unaligned * 50)
+        out5.write("Aligned / Unaligned ratio:" + "\t" + str(count_aligned * 1.0 / count_unaligned) + '\n')
+        out5.write("bin\t0-" + str(max_length) + '\n')
+        for i in xrange(len(cdf)):
+            out5.write(str(edges_unaligned[i]) + '-' + str(edges_unaligned[i+1]) + "\t" + str(cdf[i]) + '\n')
+    else:
+        out5.write("Aligned / Unaligned ratio:\t100%\n")
+
+    out5.close()
+    del unaligned_length
 
 
     # ecdf of length of aligned regions (2d length distribution) editted this part - Approach 2 relative length of ONT total over total length of the reference transcriptome it aligned to.
@@ -193,4 +243,4 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len):
         out4.write("\n")
     out4.close()
 
-    return count_aligned
+    return count_aligned, count_unaligned, unaligned_length
