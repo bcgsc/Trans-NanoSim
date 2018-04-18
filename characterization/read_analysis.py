@@ -214,7 +214,7 @@ def main(argv):
         num_unaligned = len(unaligned_length)
 
     else:
-        print("Please specify an acceptable alignment file: MAF or SAM")
+        print("Please specify an acceptable alignment files: MAF or SAM")
         usage()
         sys.exit(1)
 

@@ -59,13 +59,14 @@ def flex_bins(num_of_bins, ratio_dict, num_of_reads):
 
 def get_head_tail(cigar_string):
 
-    #Process the head and tail info
     head_info = cigar_string[0]
     tail_info = cigar_string[-1]
+
     if head_info.type == "S":
         head = head_info.size
     else:
         head = 0
+
     if tail_info.type == "S":
         tail = tail_info.size
     else:
@@ -134,8 +135,8 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len, alnm
             else:
                 count_unaligned += 1
                 unaligned_length.append(len(r.read.seq))
+
     else:
-        #follow the nanosim approach to calculate the length distributions.
         for qname in dict_trx_alignment:
             ref_line = dict_trx_alignment[qname][0]
             query_line = dict_trx_alignment[qname][1]
@@ -161,23 +162,6 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len, alnm
                     dict_ht_ratio[head_and_tail].append(ht_ratio)
                 else:
                     dict_ht_ratio[head_and_tail] = [ht_ratio]
-
-
-    # Length distribution of unaligned reads
-    if count_unaligned != 0:
-        max_length = max(unaligned_length)
-        hist_unaligned, edges_unaligned = numpy.histogram(unaligned_length, bins=numpy.arange(0, max_length + 50, 50),
-                                                          density=True)
-        cdf = numpy.cumsum(hist_unaligned * 50)
-        out5.write("Aligned / Unaligned ratio:" + "\t" + str(count_aligned * 1.0 / count_unaligned) + '\n')
-        out5.write("bin\t0-" + str(max_length) + '\n')
-        for i in xrange(len(cdf)):
-            out5.write(str(edges_unaligned[i]) + '-' + str(edges_unaligned[i+1]) + "\t" + str(cdf[i]) + '\n')
-    else:
-        out5.write("Aligned / Unaligned ratio:\t100%\n")
-
-    out5.close()
-    del unaligned_length
 
 
     # ecdf of length of aligned regions (2d length distribution) editted this part - Approach 2 relative length of ONT total over total length of the reference transcriptome it aligned to.
@@ -242,5 +226,21 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len, alnm
             out4.write(str(align_cum[key][i]) + "\t")
         out4.write("\n")
     out4.close()
+
+
+
+    # Length distribution of unaligned reads
+    if count_unaligned != 0:
+        max_length = max(unaligned_length)
+        hist_unaligned, edges_unaligned = numpy.histogram(unaligned_length, bins=numpy.arange(0, max_length + 50, 50),
+                                                          density=True)
+        cdf = numpy.cumsum(hist_unaligned * 50)
+        out5.write("Aligned / Unaligned ratio:" + "\t" + str(count_aligned * 1.0 / count_unaligned) + '\n')
+        out5.write("bin\t0-" + str(max_length) + '\n')
+        for i in xrange(len(cdf)):
+            out5.write(str(edges_unaligned[i]) + '-' + str(edges_unaligned[i+1]) + "\t" + str(cdf[i]) + '\n')
+    else:
+        out5.write("Aligned / Unaligned ratio:\t100%\n")
+    out5.close()
 
     return count_aligned, count_unaligned, unaligned_length
