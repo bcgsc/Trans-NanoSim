@@ -191,22 +191,22 @@ def main(argv):
         dict_genome_alignment = {}
         SAM_or_BAM_Reader = HTSeq.SAM_Reader
         read_alignment_genomne = SAM_or_BAM_Reader(alignment_genome)
-        for read in read_alignment_genomne:
-            qname = read.read.name
-            if qname not in dict_genome_alignment: #Read the primary alignment only (ignores the secondary and supp alignments)
+        for alnm in read_alignment_genomne:
+            qname = alnm.read.name
+            if qname not in dict_genome_alignment: #primary alnms and unaligned reads (ignores the secondary and supp alignments)
             #test with flags too.
-                dict_genome_alignment[qname] = read
+                dict_genome_alignment[qname] = alnm
 
         # Read the transcriptome alignments to memory:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading the transcriptome alignments\n")
         dict_trx_alignment = {}
         SAM_or_BAM_Reader = HTSeq.SAM_Reader
         read_alignment_trx = SAM_or_BAM_Reader(alignment_transcriptome)
-        for read in read_alignment_trx:
-            qname = read.read.name
-            if qname not in dict_trx_alignment: #Read the primary alignment only (ignores the secondary and supp alignments)
+        for alnm in read_alignment_trx:
+            qname = alnm.read.name
+            if qname not in dict_trx_alignment: #primary alnms and unaligned reads (ignores the secondary and supp alignments)
                 # test with flags too.
-                dict_trx_alignment[qname] = read
+                dict_trx_alignment[qname] = alnm
 
     elif alnm_ftype == "MAF":
         # read the MAF alnment files to the dictionaries

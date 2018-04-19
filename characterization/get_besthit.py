@@ -42,6 +42,7 @@ def besthit_and_unaligned(infile, outmaf, outfile):
             else:
                 if flag:
                     unaligned_dict[last_name] = len(line.strip())
+                    dict_trx_alignment[last_name] = []
 
     out1.close()
     return unaligned_dict.values(), dict_trx_alignment

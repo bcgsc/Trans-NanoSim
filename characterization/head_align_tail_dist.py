@@ -10,7 +10,7 @@ from __future__ import with_statement
 import sys
 import getopt
 import numpy
-
+import matplotlib.pyplot as plt
 try:
     from six.moves import xrange
 except ImportError:
@@ -74,7 +74,8 @@ def get_head_tail(cigar_string):
 
     return head, tail
 
-def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len, alnm_ftype):
+def head_align_tail(outfile, num_of_bins, dict_trx_alignment, alnm_ftype):
+
     out1 = open(outfile + '_read_rellen_ecdf', 'w')
     out2 = open(outfile + '_read_totallen_ecdf', 'w')
     out3 = open(outfile + '_ht_ratio', 'w')
@@ -138,30 +139,34 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len, alnm
 
     else:
         for qname in dict_trx_alignment:
-            ref_line = dict_trx_alignment[qname][0]
-            query_line = dict_trx_alignment[qname][1]
-
-            ref = ref_line.strip().split()
-            aligned_ref = int(ref[3])
-            aligned.append(aligned_ref)
-
-            query = query_line.strip().split()
-            head = int(query[2])
-            middle = int(query[3])
-            tail = int(query[5]) - int(query[2]) - int(query[3])
-            total.append(int(query[5]))
-            head_and_tail = int(query[5]) - int(query[3])
-            alignment_ratio = float(query[3]) / float(query[5])
-            if middle in dict_align_ratio:
-                dict_align_ratio[middle].append(alignment_ratio)
+            if len(dict_trx_alignment[qname]) == 0:
+                count_unaligned += 1
             else:
-                dict_align_ratio[middle] = [alignment_ratio]
-            if head != 0:
-                ht_ratio = float(head) / head_and_tail
-                if head_and_tail in dict_ht_ratio:
-                    dict_ht_ratio[head_and_tail].append(ht_ratio)
+                ref_line = dict_trx_alignment[qname][0]
+                query_line = dict_trx_alignment[qname][1]
+                count_aligned += 1
+
+                ref = ref_line.strip().split()
+                aligned_ref = int(ref[3])
+                aligned.append(aligned_ref)
+
+                query = query_line.strip().split()
+                head = int(query[2])
+                middle = int(query[3])
+                tail = int(query[5]) - int(query[2]) - int(query[3])
+                total.append(int(query[5]))
+                head_and_tail = int(query[5]) - int(query[3])
+                alignment_ratio = float(query[3]) / float(query[5])
+                if middle in dict_align_ratio:
+                    dict_align_ratio[middle].append(alignment_ratio)
                 else:
-                    dict_ht_ratio[head_and_tail] = [ht_ratio]
+                    dict_align_ratio[middle] = [alignment_ratio]
+                if head != 0:
+                    ht_ratio = float(head) / head_and_tail
+                    if head_and_tail in dict_ht_ratio:
+                        dict_ht_ratio[head_and_tail].append(ht_ratio)
+                    else:
+                        dict_ht_ratio[head_and_tail] = [ht_ratio]
 
 
     # ecdf of length of aligned regions (2d length distribution) editted this part - Approach 2 relative length of ONT total over total length of the reference transcriptome it aligned to.
@@ -183,7 +188,7 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, dict_ref_len, alnm
 
 
     # ecdf of length of aligned reads
-    max_length = max(total)
+    #max_length = max(total)
     hist_reads, bin_edges = numpy.histogram(total, bins=numpy.arange(0, max_length + 50, 50), density=True)
     cdf = numpy.cumsum(hist_reads * 50)
     out2.write("bin\t0-" + str(max_length) + '\n')

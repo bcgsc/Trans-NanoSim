@@ -228,8 +228,8 @@ def hist(outfile, dict_alm, alnm_ftype):
 
             ref_line = dict_alm[0]
             query_line = dict_alm[1]
-            ref = ref_line.strip().split()
-            query = query_line.strip().split()
+            ref = ref_line.strip().split()[6]
+            query = query_line.strip().split()[6]
 
             for i in xrange(0, len(ref)):
                 if ref[i] == query[i]:
