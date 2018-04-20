@@ -95,18 +95,18 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, alnm_ftype):
 
     if alnm_ftype == "SAM":
         for qname in dict_trx_alignment:
-            r = dict_trx_alignment[qname]
-            if r.aligned:
+            alnm = dict_trx_alignment[qname]
+            if alnm.aligned:
                 count_aligned += 1
 
-                ref = r.iv.chrom
+                ref = alnm.iv.chrom
                 ref_len = dict_ref_len[ref]
-                ref_aligned = r.iv.length
+                ref_aligned = alnm.iv.length
                 aligned.append(ref_aligned) #not sure about this. test it.
 
-                read_len_total = len(r.read.seq)
+                read_len_total = len(alnm.read.seq)
                 total.append(read_len_total)
-                head, tail = get_head_tail(r.cigar)
+                head, tail = get_head_tail(alnm.cigar)
                 #for key in error_dict:
                     #dict_errors_allreads[key].extend(error_dict[key])
                 middle = read_len_total - head - tail
@@ -135,7 +135,7 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, alnm_ftype):
 
             else:
                 count_unaligned += 1
-                unaligned_length.append(len(r.read.seq))
+                unaligned_length.append(len(alnm.read.seq))
 
     else:
         for qname in dict_trx_alignment:
@@ -188,7 +188,7 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, alnm_ftype):
 
 
     # ecdf of length of aligned reads
-    #max_length = max(total)
+    max_length = max(total)
     hist_reads, bin_edges = numpy.histogram(total, bins=numpy.arange(0, max_length + 50, 50), density=True)
     cdf = numpy.cumsum(hist_reads * 50)
     out2.write("bin\t0-" + str(max_length) + '\n')
