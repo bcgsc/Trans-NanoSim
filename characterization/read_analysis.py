@@ -52,12 +52,17 @@ def main(argv):
     # Parse input and output files
     infile = ''
     outfile = 'training'
-    ref = ''
-    maf_file = ''
+    ref_g = ''
+    ref_t = ''
+    annot = ''
+    alignment_genome = ''
+    alignment_transcriptome = ''
+    aligner = ''
+    alnm_file = ''
     model_fit = True
     num_bins = 20
     try:
-        opts, args = getopt.getopt(argv, "hi:r:o:m:b:", ["infile=", "ref=", "outfile=", "no_model_fit"])
+        opts, args = getopt.getopt(argv, "hi:rg:rt:a:ga:ta:o:b:", ["infile=", "ref=", "outfile=", "no_model_fit"])
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -68,18 +73,18 @@ def main(argv):
             sys.exit(0)
         elif opt in ("-i", "--infile"):
             infile = arg
-        elif opt in ("-r", "--ref_g"):
+        elif opt in ("-rg", "--ref_g"):
             ref_g = arg
-        elif opt in ("-t", "--ref_t"):
+        elif opt in ("-rt", "--ref_t"):
             ref_t = arg
-        elif opt in ("-a", "--annotation"):
+        elif opt in ("-annot", "--annotation"):
             annot = arg
-        elif opt == "-galnm":
-            alignment_genome = arg
-        elif opt == "-talnm":
-            alignment_transcriptome = arg
-        elif opt == "-alnmf":
-            alnm_ftype = arg.upper()
+        elif opt in ("-a", "--aligner"):
+            aligner = arg
+        elif opt == "-ga":
+            g_alnm = arg
+        elif opt == "-ta":
+            t_alnm = arg
         elif opt in ("-o", "--outfile"):
             outfile = arg
         elif opt == "--no_model_fit":
@@ -92,6 +97,11 @@ def main(argv):
 
     if infile == '' or ref_g == '' or ref_t == '' or annot == '':
         print("Please specify the training reads and its reference genome and transcriptome along with the annotation GTF/GFF3 files!")
+        usage()
+        sys.exit(1)
+
+    if aligner != '' and (alignment_genome != '' or alignment_transcriptome != ''):
+        print("Please specify either an alignment file (-ga and -ta ) OR an aligner to use for alignment (-a )")
         usage()
         sys.exit(1)
 
@@ -120,14 +130,14 @@ def main(argv):
     # Read the annotation GTF/GFF3 file
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Parse the annotation file (GTF/GFF3)\n")
     # If gtf provided, convert to GFF3 (gt gtf_to_gff3)
-    annot_filename = annot.split(".")[0]
-    annot_type = annot.split(".")[1]
-    if annot_type.upper() == "GTF":
+    annot_filename, annot_file_extension = os.path.splitext(annot)
+    annot_file_extension = annot_file_extension[1:]
+    if annot_file_extension.upper() == "GTF":
         call("gt gtf_to_gff3 -tidy -o " + annot_filename + ".gff3" + annot, shell=True)
-
 
     # Next, add intron info into gff3:
     call("gt gff3 -tidy -retainids -checkids -addintrons -o " + annot_filename + "_addedintron.gff3 " + annot_filename + ".gff3", shell=True)
+
     features = HTSeq.GenomicArrayOfSets("auto", stranded=False)
     dict_intron_info = {}
     annot_gff3_withintron = annot_filename + "_addedintron.gff3"
@@ -153,80 +163,77 @@ def main(argv):
             else:
                 dict_ref_len[ref_id] += len(line.strip())
 
+    #If both alignment files are provided:
+    if g_alnm != "" and t_alnm != "":
+        g_alnm_filename, g_alnm_ext = os.path.splitext(g_alnm)
+        t_alnm_filename, t_alnm_ext = os.path.splitext(t_alnm)
+        g_alnm_ext = g_alnm_ext [1:]
+        t_alnm_ext = t_alnm_ext[1:]
+        if g_alnm_ext != t_alnm_ext:
+            print("Please provide both alignments in a same format: sam OR maf\n")
+            usage()
+            sys.exit(1)
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Processing the alignment files: " + g_alnm_ext + "\n")
+        if t_alnm_ext == "maf":
+            outmaf_g = outfile + "_genome_alnm.maf"
+            outmaf_t = outfile + "_transcriptome_alnm.maf"
+            if outmaf_g == g_alnm:
+                outmaf_g = outfile + "_genome_alnm_processed.maf"
+            if outmaf_t == t_alnm:
+                outmaf_t = outfile + "_transcriptome_alnm_processed.maf"
 
-    # If either of the alignment files are not provided (sam files):
-    if alignment_genome == '' or alignment_transcriptome == '':
-        alignment_genome = outfile + "_genome_alnm.sam"
-        alignment_transcriptome = outfile + "_transcriptome_alnm.sam"
+            call("grep '^s ' " + g_alnm + " > " + outmaf_g, shell=True)
+            call("grep '^s ' " + t_alnm + " > " + outmaf_t, shell=True)
 
-        # Alignment to reference genome
-        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference genome\n")
-        call("minimap2 --MD -ax map-ont " + ref_g + " " + infile + " > " + alignment_genome, shell=True)
-        # Alignment to reference transcriptome
-        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
-        call("minimap2 --cs -ax splice " + ref_t + " " + infile + " > " + alignment_transcriptome, shell=True)
-        alnm_ftype = "SAM"
+            unaligned_length = list(get_besthit_maf.besthit_and_unaligned(in_fasta, outmaf_t, outfile))
 
-    else:
+        elif t_alnm_ext == "sam":
 
-        if alnm_ftype == "MAF":
-            out_maf_genome = outfile + "_genome_alnm.maf"
-            out_maf_trx = outfile + "_transcriptome_alnm.maf"
-            if out_maf_genome == alignment_genome:
-                out_maf_genome = outfile + "_genome_alnm_processed.maf"
-            if out_maf_trx == alignment_transcriptome:
-                out_maf_trx = outfile + "_transcriptome_alnm_processed.maf"
-
-            call("grep '^s ' " + alignment_genome + " > " + out_maf_genome, shell=True)
-            call("grep '^s ' " + alignment_transcriptome + " > " + out_maf_trx, shell=True)
-        elif alnm_ftype == "SAM":
-            # do any preproccessing on SAM alnm files if necessary
-            pass
-
-
-    # Read the genome alignments to memory:
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading the genome alignments\n")
-
-    if alnm_ftype == "SAM":
-        dict_genome_alignment = {}
-        SAM_or_BAM_Reader = HTSeq.SAM_Reader
-        read_alignment_genomne = SAM_or_BAM_Reader(alignment_genome)
-        for alnm in read_alignment_genomne:
-            qname = alnm.read.name
-            if qname not in dict_genome_alignment: #primary alnms and unaligned reads (ignores the secondary and supp alignments)
-            #test with flags too.
-                dict_genome_alignment[qname] = alnm
-
-        # Read the transcriptome alignments to memory:
-        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading the transcriptome alignments\n")
-        dict_trx_alignment = {}
-        SAM_or_BAM_Reader = HTSeq.SAM_Reader
-        read_alignment_trx = SAM_or_BAM_Reader(alignment_transcriptome)
-        for alnm in read_alignment_trx:
-            qname = alnm.read.name
-            if qname not in dict_trx_alignment: #primary alnms and unaligned reads (ignores the secondary and supp alignments)
-                # test with flags too.
-                dict_trx_alignment[qname] = alnm
-
-    elif alnm_ftype == "MAF":
-        # read the MAF alnment files to the dictionaries
-        unaligned_length, dict_trx_alignment = get_besthit.besthit_and_unaligned(in_fasta, out_maf_trx, outfile)
-        num_unaligned = len(unaligned_length)
+            unaligned_length = list(get_primary_sam.primary_and_unaligned(t_alnm, outfile))
 
     else:
-        print("Please specify an acceptable alignment files: MAF or SAM")
-        usage()
-        sys.exit(1)
+        if aligner == "minimap2" or aligner == "":  # Align with minimap2 by default
+            g_alnm_ext = "sam"
+            t_alnm_ext = "sam"
+            outsam_g = outfile + "_genome_alnm.sam"
+            outsam_t = outfile + "_transcriptome_alnm.sam"
+            # Alignment to reference genome
+            sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference genome\n")
+            call("minimap2 --cs --MD -ax map-ont " + ref_g + " " + in_fasta + " > " + outsam_g, shell=True)
+            # Alignment to reference transcriptome
+            sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
+            call("minimap2 --cs -ax splice " + ref_t + " " + in_fasta + " > " + outsam_t, shell=True)
+
+            unaligned_length = list(get_primary_sam.primary_and_unaligned(outsam_t, outfile))
+
+        elif aligner == "LAST":
+            g_alnm_ext = "maf"
+            t_alnm_ext = "maf"
+            outmaf_g = outfile + "_genome_alnm.maf"
+            outmaf_t = outfile + "_transcriptome_alnm.maf"
+            # Alignment to reference genome
+            sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with LAST to reference genome\n")
+            call("lastdb ref_genome " + ref_g, shell=True)
+            call("lastal -a 1 ref_genome " + in_fasta + " | grep '^s ' > " + outmaf_g, shell=True)
+            # Alignment to reference transcriptome
+            sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with LAST to reference transcriptome\n")
+            call("lastdb ref_transcriptome " + ref_t, shell=True)
+            call("lastal -a 1 ref_transcriptome " + in_fasta + " | grep '^s ' > " + outmaf_t, shell=True)
+
+            unaligned_length = list(get_besthit_maf.besthit_and_unaligned(in_fasta, outmaf_t, outfile))
+
+        else:
+            print("Please specify an acceptable aligner (minimap2 or LAST)\n")
+            usage()
+            sys.exit(1)
 
     # Reads length distribution analysis
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reads length distribution analysis\n")
-    num_aligned, num_unaligned, unaligned_length = align.head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len, alnm_ftype)
-    #num_aligned = head_align_tail(outfile, num_bins, dict_trx_alignment, dict_ref_len)
-
+    num_aligned = align.head_align_tail(outfile, num_bins, dict_ref_len, t_alnm_ext)
 
     # MATCH AND ERROR MODELS
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": match and error models\n")
-    error_model.hist(outfile, dict_trx_alignment)
+    error_model.hist(outfile, t_alnm_ext)
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")
