@@ -227,9 +227,26 @@ def main(argv):
             usage()
             sys.exit(1)
 
-    # Reads length distribution analysis
+
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reads length distribution analysis\n")
-    num_aligned = align.head_align_tail(outfile, num_bins, dict_ref_len, t_alnm_ext)
+    # Aligned reads length distribution analysis
+    count_aligned = align.head_align_tail(outfile, num_bins, dict_ref_len, t_alnm_ext)
+
+    # Unaligned reads length distribution analysis
+    out1 = open(outfile + "_unaligned_length_ecdf", 'w')
+    count_unaligned = len(unaligned_length)
+    if count_unaligned != 0:
+        max_length = max(unaligned_length)
+        hist_unaligned, edges_unaligned = numpy.histogram(unaligned_length, bins=numpy.arange(0, max_length + 50, 50),
+                                                          density=True)
+        cdf = numpy.cumsum(hist_unaligned * 50)
+        out1.write("Aligned / Unaligned ratio:" + "\t" + str(count_aligned * 1.0 / count_unaligned) + '\n')
+        out1.write("bin\t0-" + str(max_length) + '\n')
+        for i in xrange(len(cdf)):
+            out1.write(str(edges_unaligned[i]) + '-' + str(edges_unaligned[i+1]) + "\t" + str(cdf[i]) + '\n')
+    else:
+        out1.write("Aligned / Unaligned ratio:\t100%\n")
+    out1.close()
 
     # MATCH AND ERROR MODELS
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": match and error models\n")

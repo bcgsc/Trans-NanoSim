@@ -74,7 +74,7 @@ def get_head_tail(cigar_string):
 
     return head, tail
 
-def head_align_tail(outfile, num_of_bins, dict_trx_alignment, alnm_ftype):
+def head_align_tail(outfile, num_of_bins, alnm_ftype):
 
     out1 = open(outfile + '_read_rellen_ecdf', 'w')
     out2 = open(outfile + '_read_totallen_ecdf', 'w')
@@ -93,22 +93,22 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, alnm_ftype):
     dict_align_ratio = {}
     dict_rellen = {}
 
-    if alnm_ftype == "SAM":
-        for qname in dict_trx_alignment:
-            alnm = dict_trx_alignment[qname]
+    if alnm_ftype == "sam":
+        sam_reader = HTSeq.SAM_Reader
+        alnm_file_sam = outfile + "_primary.sam"
+        t_alignments = sam_reader(alnm_file_sam)
+        for alnm in t_alignments:
             if alnm.aligned:
                 count_aligned += 1
 
                 ref = alnm.iv.chrom
                 ref_len = dict_ref_len[ref]
                 ref_aligned = alnm.iv.length
-                aligned.append(ref_aligned) #not sure about this. test it.
+                aligned.append(ref_aligned)
 
                 read_len_total = len(alnm.read.seq)
                 total.append(read_len_total)
                 head, tail = get_head_tail(alnm.cigar)
-                #for key in error_dict:
-                    #dict_errors_allreads[key].extend(error_dict[key])
                 middle = read_len_total - head - tail
 
                 #ratio aligned part over total length of the read
@@ -133,17 +133,13 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, alnm_ftype):
                 else:
                     dict_rellen[ref_len].append(relative_length)
 
-            else:
-                count_unaligned += 1
-                unaligned_length.append(len(alnm.read.seq))
 
     else:
-        for qname in dict_trx_alignment:
-            if len(dict_trx_alignment[qname]) == 0:
-                count_unaligned += 1
-            else:
-                ref_line = dict_trx_alignment[qname][0]
-                query_line = dict_trx_alignment[qname][1]
+        besthit_out = outfile + "_besthit.maf"
+        with open(besthit_out, 'r') as f:
+            for line in f:
+                ref_line = line
+                query_line = next(f)
                 count_aligned += 1
 
                 ref = ref_line.strip().split()
@@ -233,19 +229,4 @@ def head_align_tail(outfile, num_of_bins, dict_trx_alignment, alnm_ftype):
     out4.close()
 
 
-
-    # Length distribution of unaligned reads
-    if count_unaligned != 0:
-        max_length = max(unaligned_length)
-        hist_unaligned, edges_unaligned = numpy.histogram(unaligned_length, bins=numpy.arange(0, max_length + 50, 50),
-                                                          density=True)
-        cdf = numpy.cumsum(hist_unaligned * 50)
-        out5.write("Aligned / Unaligned ratio:" + "\t" + str(count_aligned * 1.0 / count_unaligned) + '\n')
-        out5.write("bin\t0-" + str(max_length) + '\n')
-        for i in xrange(len(cdf)):
-            out5.write(str(edges_unaligned[i]) + '-' + str(edges_unaligned[i+1]) + "\t" + str(cdf[i]) + '\n')
-    else:
-        out5.write("Aligned / Unaligned ratio:\t100%\n")
-    out5.close()
-
-    return count_aligned, count_unaligned, unaligned_length
+    return count_aligned
