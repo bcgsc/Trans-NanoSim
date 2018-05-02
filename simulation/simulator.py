@@ -33,9 +33,9 @@ import mixed_models as mm
 
 PYTHON_VERSION = sys.version_info
 VERSION = "1.0.0"
-PRORAM = "NanoSim"
-AUTHOR = "Chen Yang (UBC & BCGSC)"
-CONTACT = "cheny@bcgsc.ca"
+PRORAM = "Trans-NanoSim"
+AUTHOR = "Saber HafezQorani (UBC & BCGSC)"
+CONTACT = "shafezqorani@bcgsc.ca"
 
 BASES = ['A', 'T', 'C', 'G']
 
@@ -175,17 +175,17 @@ def select_ref_transcript(input_dict):
     return length
 
 
-def get_length_ratio(dict_ratio, len_ref, max_l, min_l):
+def get_length_ratio(dict_ratio, len_ref):
 
     for item in dict_ratio.keys():
-        if item[0] < len_ref <= item[1]:
-            break
-    p = random.random()
-    for k_r, v_r in dict_ratio[item].items():
-        if k_r[0] <= p < k_r[1]:
-            align_ratio = (v_r[01] + v_r[1]) / float(2) #update this part the same as align ratio section so that I get ratio correctly
-            break
-    return item, int(len_ref * align_ratio)
+        if item[0] <= len_ref < item[1]:
+            p = random.random()
+            for k_r, v_r in dict_ratio[item].items():
+                if k_r[0] <= p < k_r[1]:
+                    r = (p - k_r[0]) / (k_r[1] - k_r[0]) * (v_r[1] - v_r[0]) + v_r[0]
+                    ref_aligned = int(round(len_ref * r))
+                    break
+    return item, ref_aligned
 
 
 def get_length_2d(len_dict, len_ref, max_l, min_l):
@@ -251,39 +251,39 @@ def get_length(len_dict, num, max_l, min_l):
 
 def read_profile(number, model_prefix, per, max_l, min_l):
     global unaligned_length, number_aligned, aligned_dict
-    global match_ht_list, align_ratio, ht_dict, error_par
-    global trans_error_pr, match_markov_model
+    global first_match_hist, align_ratio, ht_dict, error_model_profile
+    global error_markov_model, match_markov_model
 
 
     # Read model profile for match, mismatch, insertion and deletions
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read error profile\n")
     sys.stdout.flush()
-    error_par = {}
+    error_model_profile = {}
     model_profile = model_prefix + "_model_profile"
     with open(model_profile, 'r') as mod_profile:
         mod_profile.readline()
         for line in mod_profile:
             new_line = line.strip().split("\t")
             if "mismatch" in line:
-                error_par["mis"] = [float(x) for x in new_line[1:]]
+                error_model_profile["mis"] = [float(x) for x in new_line[1:]]
             elif "insertion" in line:
-                error_par["ins"] = [float(x) for x in new_line[1:]]
+                error_model_profile["ins"] = [float(x) for x in new_line[1:]]
             else:
-                error_par["del"] = [float(x) for x in new_line[1:]]
+                error_model_profile["del"] = [float(x) for x in new_line[1:]]
 
-    trans_error_pr = {}
+    error_markov_model = {}
     with open(model_prefix + "_error_markov_model", "r") as error_markov:
         error_markov.readline()
         for line in error_markov:
             info = line.strip().split()
             k = info[0]
-            trans_error_pr[k] = {}
-            trans_error_pr[k][(0, float(info[1]))] = "mis"
-            trans_error_pr[k][(float(info[1]), float(info[1]) + float(info[2]))] = "ins"
-            trans_error_pr[k][(1 - float(info[3]), 1)] = "del"
+            error_markov_model[k] = {}
+            error_markov_model[k][(0, float(info[1]))] = "mis"
+            error_markov_model[k][(float(info[1]), float(info[1]) + float(info[2]))] = "ins"
+            error_markov_model[k][(1 - float(info[3]), 1)] = "del"
 
     with open(model_prefix + "_first_match.hist", 'r') as fm_profile:
-        match_ht_list = read_ecdf(fm_profile)
+        first_match_hist = read_ecdf(fm_profile)
 
     with open(model_prefix + "_match_markov_model", 'r') as mm_profile:
         match_markov_model = read_ecdf(mm_profile)
@@ -291,7 +291,7 @@ def read_profile(number, model_prefix, per, max_l, min_l):
     # Read length of unaligned reads
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read ECDF of unaligned reads\n")
     sys.stdout.flush()
-    unaligned_length = []
+    unaligned_length = [] #remove this line. no need for it.
     with open(model_prefix + "_unaligned_length_ecdf", 'r') as u_profile:
         new = u_profile.readline().strip()
         rate = new.split('\t')[1]
@@ -323,7 +323,7 @@ def read_profile(number, model_prefix, per, max_l, min_l):
     if per:
         length_profile = model_prefix + "_aligned_reads_ecdf"
     else:
-        length_profile = model_prefix + "_reftransc_totalONT_allbins_ecdf_v2"
+        length_profile = model_prefix + "_read_rellen_ecdf"
 
     with open(length_profile, 'r') as align_profile:
         aligned_dict = read_ecdf(align_profile)
@@ -376,8 +376,8 @@ def readfq(fp):  # this is a generator function
 def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
     global unaligned_length, number_aligned, aligned_dict
     global genome_len, seq_dict, seq_len, dict_exp, ecdf_dict_ref
-    global match_ht_list, align_ratio, ht_dict, match_markov_model
-    global trans_error_pr, error_par
+    global first_match_hist, align_ratio, ht_dict, match_markov_model
+    global error_markov_model, error_model_profile
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read in reference transcriptome (length and expression)\n")
     sys.stdout.flush()
@@ -397,14 +397,8 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
     sys.stdout.write("\n")
     sys.stdout.flush()
 
-    #there is no need to define whether genome is circular or linear because we deal with transcriptome.
-    #if len(seq_dict) > 1 and dna_type == "circular":
-        #sys.stderr.write("Do not choose circular if there is more than one chromosome in the genome!")
-        #sys.exit(1)
-
     for key in seq_dict.keys():
         seq_len[key] = len(seq_dict[key])
-    #genome_len = sum(seq_len.values()) #there is no need for this too as we deal with transcriptome not genome
 
     #Read the expression profile.
     #I need to improve it so that it reads any input and generates errors
@@ -431,8 +425,8 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
     num_unaligned_length = len(unaligned_length)
     for i in xrange(num_unaligned_length):
         unaligned = unaligned_length[i]
-        unaligned, error_dict = unaligned_error_list(unaligned, error_par)
-        new_read, new_read_name = extract_read_unaligned(dna_type, unaligned)
+        unaligned, error_dict = unaligned_error_list(unaligned, error_model_profile)
+        new_read, new_read_name = extract_read(unaligned)
         new_read_name = new_read_name + "_unaligned_" + str(i)
         # Change lowercase to uppercase and replace N with any base
         new_read = case_convert(new_read)
@@ -455,11 +449,11 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
     sys.stdout.flush()
 
     if per:
-        ref_length = get_length(aligned_dict, number_aligned, max_l, min_l)
+        read_total_len = get_length(aligned_dict, number_aligned, max_l, min_l)
         del aligned_dict
 
         for i in xrange(number_aligned):
-            new_read, new_read_name = extract_read(dna_type, ref_length[i])
+            new_read, new_read_name = extract_read(read_total_len[i])
             new_read_name = new_read_name + "_perfect_" + str(i)
 
             # Reverse complement half of the reads
@@ -470,7 +464,7 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
             else:
                 new_read_name += "_F"
 
-            out_reads.write(">" + new_read_name + "_0_" + str(ref_length[i]) + "_0" + '\n')
+            out_reads.write(">" + new_read_name + "_0_" + str(read_total_len[i]) + "_0" + '\n')
 
             # Change lowercase to uppercase and replace N with any base
             new_read = case_convert(new_read)
@@ -483,24 +477,25 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
     i = 0
     while i < number_aligned:
         while True:
-            #pick Ta of length La (according to expression profiles)
-            ref_len = max(50, select_ref_transcript(ecdf_dict_ref_exp))
-            #pick a ratio from appropriate bin (Rx)
-            key_range, ont_total = get_length_ratio(aligned_dict, ref_len, max_l, min_l)
-            if ont_total != 0:
-                middle, middle_ref, error_dict = error_list(ont_total, match_markov_model, match_ht_list, error_par, trans_error_pr)
+            #pick a reference to simulate a read out of it.
+            ref_len_total = max(50, select_ref_transcript(ecdf_dict_ref_exp))
+            #get the align region ratio out of this ref len total
+            key_range, ref_len_aligned = get_length_ratio(aligned_dict, ref_len_total)
+            if ref_len_aligned != 0:
+                middle_read, middle_ref, error_dict = error_list(ref_len_aligned, match_markov_model, first_match_hist, error_model_profile, error_markov_model)
                 if middle_ref < key_range[1]:
                     break
+
         for k_align in sorted(align_ratio.keys()):
-            if k_align[0] <= middle < k_align[1]:
+            if k_align[0] <= middle_read < k_align[1]:
                 break
 
         p = random.random()
         for k_r, v_r in align_ratio[k_align].items():
             if k_r[0] <= p < k_r[1]:
-                a_ratio = (p - k_r[0]) / (k_r[1] - k_r[0]) * (v_r[1] - v_r[0]) + v_r[0]
-                total = int(round(middle / a_ratio))
-                remainder = total - int(round(middle))
+                a_ratio = (p - k_r[0])/(k_r[1] - k_r[0]) * (v_r[1] - v_r[0]) + v_r[0]
+                total = int(round(middle_read / a_ratio))
+                remainder = total - int(round(middle_read))
                 break
 
         if total > max_l:
@@ -515,11 +510,12 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
                     p = random.random()
                     for k_h, v_h in ht_dict[k_ht].items():
                         if k_h[0] <= p < k_h[1]:
-                            ratio = (p - k_h[0]) / (k_h[1] - k_h[0]) * (v_h[1] - v_h[0]) + v_h[0]
+                            ratio = (p - k_h[0])/(k_h[1] - k_h[0]) * (v_h[1] - v_h[0]) + v_h[0]
                             head = int(round(remainder * ratio))
                             tail = remainder - head
                             break
                     break
+
             # if remainder is larger than any empirical value, then randomly divide it into head and tail
             try:
                 head
@@ -527,9 +523,10 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
                 p = random.random()
                 head = int(round(remainder * p))
                 tail = remainder - head
+
         try:
-            # Extract middle region from reference transcript
-            new_read, new_read_name = extract_read_v2(dna_type, middle_ref, key_range)
+            # Extract error introduced middle region from reference transcript
+            new_read, new_read_name = extract_read_withrange(middle_ref, key_range)
             new_read_name = new_read_name + "_aligned_" + str(i + num_unaligned_length)
         except:
             print(i, ref_len, ont_total, middle, middle_ref, head, tail, key_range)
@@ -563,6 +560,7 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
         i += 1
 
 
+
     out_reads.close()
     out_error.close()
 
@@ -578,62 +576,21 @@ def reverse_complement(seq):
     return reverse_seq
 
 
-def extract_read(dna_type, length):
-    global seq_dict, seq_len, genome_len
-
-    if length > max(seq_len.values()):
-        length = max(seq_len.values())
-
-    # Extract the aligned region from reference
-    if dna_type == "circular":
-        ref_pos = random.randint(0, genome_len)
-        chromosome = list(seq_dict.keys())[0]
-        new_read_name = chromosome + "_" + str(ref_pos)
-        if length + ref_pos <= genome_len:
-            new_read = seq_dict[chromosome][ref_pos: ref_pos + length]
-        else:
-            new_read = seq_dict[chromosome][ref_pos:]
-            new_read = new_read + seq_dict[chromosome][0: length - genome_len + ref_pos]
-    else:
-        # Generate a random number within the size of the genome. Suppose chromosomes are connected
-        # tail to head one by one in the order of the dictionary. If the start position fits in one
-        # chromosome, but the end position does not, then restart generating random number.
-        while True:
-            new_read = ""
-            ref_pos = random.randint(0, genome_len)
-            for key in seq_len.keys():
-                if ref_pos + length <= seq_len[key]:
-                    new_read = seq_dict[key][ref_pos: ref_pos + length]
-                    new_read_name = key + "_" + str(ref_pos)
-                    break
-                elif ref_pos < seq_len[key]:
-                    break
-                else:
-                    ref_pos -= seq_len[key]
-            if new_read != "":
-                break
-    return new_read, new_read_name
-
-
-def extract_read_unaligned(dna_type, length):
+def extract_read(length):
     global seq_dict, seq_len
-
-    seq_len_temp = {}
-    for key, value in seq_len.items():
-        if length < value:
-            seq_len_temp[key] = value
 
     while True:
         new_read = ""
-        key = random.choice(seq_len_temp.keys())
-        ref_pos = random.randint(0, seq_len_temp[key] - length)
-        new_read = seq_dict[key][ref_pos: ref_pos + length]
-        new_read_name = key + "_" + str(ref_pos)
-        break
+        key = random.choice(seq_len.keys())
+        if length < seq_len[key]:
+            ref_pos = random.randint(0, seq_len[key] - length)
+            new_read = seq_dict[key][ref_pos: ref_pos + length]
+            new_read_name = key + "_" + str(ref_pos)
+            break
     return new_read, new_read_name
 
 
-def extract_read_v2(dna_type, length, key_range):
+def extract_read_withrange(length, key_range):
     global seq_dict, seq_len
 
     seq_len_temp = {}
@@ -641,25 +598,14 @@ def extract_read_v2(dna_type, length, key_range):
         if key_range[0] < value <= key_range[1]:
             seq_len_temp[key] = value
 
-    # Extract the aligned region from reference
-    if dna_type == "circular":
-        ref_pos = random.randint(0, genome_len)
-        chromosome = list(seq_dict.keys())[0]
-        new_read_name = chromosome + "_" + str(ref_pos)
-        if length + ref_pos <= genome_len:
-            new_read = seq_dict[chromosome][ref_pos: ref_pos + length]
-        else:
-            new_read = seq_dict[chromosome][ref_pos:]
-            new_read = new_read + seq_dict[chromosome][0: length - genome_len + ref_pos]
-    else:
-        while True:
-            new_read = ""
-            key = random.choice(seq_len_temp.keys())
-            if length < seq_len_temp[key]:
-                ref_pos = random.randint(0, seq_len_temp[key] - length)
-                new_read = seq_dict[key][ref_pos: ref_pos + length]
-                new_read_name = key + "_" + str(ref_pos)
-                break
+    while True:
+        new_read = ""
+        key = random.choice(seq_len_temp.keys())
+        if length < seq_len_temp[key]:
+            ref_pos = random.randint(0, seq_len_temp[key] - length)
+            new_read = seq_dict[key][ref_pos: ref_pos + length]
+            new_read_name = key + "_" + str(ref_pos)
+            break
     return new_read, new_read_name
 
 
@@ -860,12 +806,8 @@ def main():
         usage()
         sys.exit(1)
     else:
-        dna_type = sys.argv[1]
-        if dna_type not in ["circular", "linear"]:
-            usage()
-            sys.exit(1)
         try:
-            opts, args = getopt.getopt(sys.argv[2:], "hr:e:c:o:n:i:d:m:",
+            opts, args = getopt.getopt(sys.argv[1:], "hr:e:c:o:n:i:d:m:",
                                        ["max_len=", "min_len=", "perfect", "KmerBias="])
         except getopt.GetoptError:
             usage()
