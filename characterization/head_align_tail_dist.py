@@ -62,12 +62,12 @@ def get_head_tail(cigar_string):
     head_info = cigar_string[0]
     tail_info = cigar_string[-1]
 
-    if head_info.type == "S":
+    if head_info.type == "S" or head_info.type == "H":
         head = head_info.size
     else:
         head = 0
 
-    if tail_info.type == "S":
+    if tail_info.type == "S" or tail_info.type == "H":
         tail = tail_info.size
     else:
         tail = 0
