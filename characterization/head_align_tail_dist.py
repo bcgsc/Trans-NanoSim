@@ -74,7 +74,7 @@ def get_head_tail(cigar_string):
 
     return head, tail
 
-def head_align_tail(outfile, num_of_bins, alnm_ftype):
+def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
 
     out1 = open(outfile + '_read_rellen_ecdf', 'w')
     out2 = open(outfile + '_read_totallen_ecdf', 'w')
@@ -126,8 +126,8 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype):
                     else:
                         dict_ht_ratio[head_and_tail].append(ht_ratio)
 
-                #relative_length : total len of read over total len of reference transcriptome
-                relative_length = float(read_len_total) / ref_len
+                #relative_length = float(read_len_total) / ref_len
+                relative_length = float(ref_aligned) / ref_len #experimenting this relative ratio aligned ref / total ref
                 if ref_len not in dict_rellen:
                     dict_rellen[ref_len] = [relative_length]
                 else:
@@ -143,8 +143,9 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype):
                 count_aligned += 1
 
                 ref = ref_line.strip().split()
-                aligned_ref = int(ref[3])
-                aligned.append(aligned_ref)
+                ref_aligned = int(ref[3])
+                ref_len = dict_ref_len[ref[1]]
+                aligned.append(ref_aligned)
 
                 query = query_line.strip().split()
                 head = int(query[2])
@@ -164,8 +165,15 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype):
                     else:
                         dict_ht_ratio[head_and_tail] = [ht_ratio]
 
+                # relative_length = float(read_len_total) / ref_len
+                relative_length = float(ref_aligned) / ref_len #experimenting this relative ratio aligned ref / total ref
+                if ref_len not in dict_rellen:
+                    dict_rellen[ref_len] = [relative_length]
+                else:
+                    dict_rellen[ref_len].append(relative_length)
 
-    # ecdf of length of aligned regions (2d length distribution) editted this part - Approach 2 relative length of ONT total over total length of the reference transcriptome it aligned to.
+
+    # ecdf of length of aligned regions (2d length distribution)
     rel_len_bins = flex_bins(num_of_bins, dict_rellen, count_aligned)
     rel_len_cum = dict.fromkeys(rel_len_bins.keys(), [])
     for key, value in rel_len_bins.items():
