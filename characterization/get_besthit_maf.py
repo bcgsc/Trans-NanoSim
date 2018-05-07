@@ -43,4 +43,5 @@ def besthit_and_unaligned(infile, outmaf, outfile):
                     unaligned_dict[last_name] = len(line.strip())
 
     out1.close()
+    del align_dict
     return unaligned_dict.values()
