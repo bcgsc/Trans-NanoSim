@@ -21,11 +21,13 @@ except ImportError:
 import sys
 import os
 import getopt
+import argparse
 import HTSeq
 import pysam
 import numpy
 import head_align_tail_dist as align
-import get_besthit
+import get_besthit_maf
+import get_primary_sam
 import besthit_to_histogram as error_model
 
 
@@ -36,18 +38,19 @@ def usage():
                     "<options>: \n" \
                     "-h : print usage message\n" \
                     "-i : training ONT real reads, must be fasta files\n" \
-                    "-r : reference genome of the training reads\n" \
-                    "-t : reference transcriptome of the training reads\n" \
-                    "-a : reference GTF/GFF3 annotation files\n" \
-                    "-sg : User can provide their own genome alignment file, with sam extension\n" \
-                    "-st : User can provide their own transcriptome alignment file, with sam extension\n" \
-                    "-b : number of bins (for development), default = 20\n" \
-                    "-o : The prefix of output file, default = 'training'\n"
+                    "-rg : reference genome of the training reads\n" \
+                    "-rt : reference transcriptome of the training reads\n" \
+                    "-annot : reference GTF/GFF3 annotation files\n" \
+                    "-a : Aligner to be used: minimap2 or lastal (default=minimap2)\n" \
+                    "-ga : User can provide their own genome alignment file, with sam extension\n" \
+                    "-ta : User can provide their own transcriptome alignment file, with sam extension\n" \
+                    "-o : The prefix of output file, default = 'training'\n" \
+                    "-b : number of bins (for development), default = 20 \n"
 
     sys.stderr.write(usage_message)
 
 
-def main(argv):
+def main():
 
     # Parse input and output files
     infile = ''
@@ -58,26 +61,55 @@ def main(argv):
     alignment_genome = ''
     alignment_transcriptome = ''
     aligner = ''
-    alnm_file = ''
     model_fit = True
     num_bins = 20
+
+    parser = argparse.ArgumentParser(
+        description='Given the read profiles from characterization step, ' \
+                    'simulate transcriptome ONT reads and output error profiles',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument('-i', '--read', help='Input read for training.', required=True)
+    parser.add_argument('-rg', '--ref_g', help='Reference genome.', required=True)
+    parser.add_argument('-rt', '--ref_t', help='Reference Transcriptome.', required=True)
+    parser.add_argument('-annot', '--annot', help='Annotation file in ensemble GTF/GFF formats.', required=True)
+    parser.add_argument('-a', '--aligner', help='The aligner to be used minimap2 or last (Default = minimap2)')
+    parser.add_argument('-ga', '--g_alnm', help='Genome alignment file in sam or maf format (optional)')
+    parser.add_argument('-ta', '--t_alnm', help='Transcriptome alignment file in sam or maf format (optional)')
+    parser.add_argument('-o', '--output', help='The output name and location for profiles')
+    parser.add_argument('--no_model_fit', help='Enable/disable model fitting step')
+    parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)')
+
+    args = parser.parse_args()
+
+    infile = args.read
+    ref_g = args.ref_g
+    ref_t = args.ref_t
+    annot = args.annot
+    aligner = args.aligner
+    alignment_genome = args.g_alnm
+    alignment_transcriptome = args.t_alnm
+    outfile = args.output
+    model_fit = args.no_model_fit
+    num_bins = args.num_bins
+
+    '''
     try:
-        opts, args = getopt.getopt(argv, "hi:rg:rt:a:ga:ta:o:b:", ["infile=", "ref=", "outfile=", "no_model_fit"])
+        opts, args = getopt.getopt(argv, "hi:rg:rt:aob:", ["infile=", "rg=", "ref_g=", "ref_t=", "aligner=","outfile=", "no_model_fit"])
     except getopt.GetoptError:
         usage()
         sys.exit(1)
-
-    for opt, arg in opts:
+        
         if opt == '-h':
             usage()
             sys.exit(0)
         elif opt in ("-i", "--infile"):
             infile = arg
-        elif opt in ("-rg", "--ref_g"):
+        elif opt in ("-g", "--ref_g"):
             ref_g = arg
-        elif opt in ("-rt", "--ref_t"):
+        elif opt in ("-t", "--ref_t"):
             ref_t = arg
-        elif opt in ("-annot", "--annotation"):
+        elif opt in ("-f", "--annotation"):
             annot = arg
         elif opt in ("-a", "--aligner"):
             aligner = arg
@@ -92,8 +124,10 @@ def main(argv):
         elif opt == "-b":
             num_bins = max(int(arg), 1)
         else:
+            print("there is error here \n")
             usage()
             sys.exit(1)
+    '''
 
     if infile == '' or ref_g == '' or ref_t == '' or annot == '':
         print("Please specify the training reads and its reference genome and transcriptome along with the annotation GTF/GFF3 files!")
@@ -266,6 +300,7 @@ def main(argv):
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
 
 
+
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
 
