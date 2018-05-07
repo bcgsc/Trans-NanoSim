@@ -58,9 +58,9 @@ def main():
     ref_g = ''
     ref_t = ''
     annot = ''
-    alignment_genome = ''
-    alignment_transcriptome = ''
     aligner = ''
+    g_alnm = ''
+    t_alnm = ''
     model_fit = True
     num_bins = 20
 
@@ -77,7 +77,7 @@ def main():
     parser.add_argument('-ga', '--g_alnm', help='Genome alignment file in sam or maf format (optional)')
     parser.add_argument('-ta', '--t_alnm', help='Transcriptome alignment file in sam or maf format (optional)')
     parser.add_argument('-o', '--output', help='The output name and location for profiles')
-    parser.add_argument('--no_model_fit', help='Enable/disable model fitting step')
+    parser.add_argument('-mf', '--model_fit', help='Enable/disable model fitting step')
     parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)')
 
     args = parser.parse_args()
@@ -86,48 +86,28 @@ def main():
     ref_g = args.ref_g
     ref_t = args.ref_t
     annot = args.annot
-    aligner = args.aligner
-    alignment_genome = args.g_alnm
-    alignment_transcriptome = args.t_alnm
+    if args.aligner:
+        aligner = args.aligner
+    if args.g_alnm:
+        g_alnm = args.g_alnm
+    if args.t_alnm:
+        t_alnm = args.t_alnm
     outfile = args.output
-    model_fit = args.no_model_fit
-    num_bins = args.num_bins
+    model_fit = args.model_fit
+    if args.num_bins:
+        num_bins = max(args.num_bins, 1)
 
-    '''
-    try:
-        opts, args = getopt.getopt(argv, "hi:rg:rt:aob:", ["infile=", "rg=", "ref_g=", "ref_t=", "aligner=","outfile=", "no_model_fit"])
-    except getopt.GetoptError:
-        usage()
-        sys.exit(1)
-        
-        if opt == '-h':
-            usage()
-            sys.exit(0)
-        elif opt in ("-i", "--infile"):
-            infile = arg
-        elif opt in ("-g", "--ref_g"):
-            ref_g = arg
-        elif opt in ("-t", "--ref_t"):
-            ref_t = arg
-        elif opt in ("-f", "--annotation"):
-            annot = arg
-        elif opt in ("-a", "--aligner"):
-            aligner = arg
-        elif opt == "-ga":
-            g_alnm = arg
-        elif opt == "-ta":
-            t_alnm = arg
-        elif opt in ("-o", "--outfile"):
-            outfile = arg
-        elif opt == "--no_model_fit":
-            model_fit = False
-        elif opt == "-b":
-            num_bins = max(int(arg), 1)
-        else:
-            print("there is error here \n")
-            usage()
-            sys.exit(1)
-    '''
+    print ("Running the characterization step with following arguments: \n")
+    print ("infile", infile)
+    print ("ref_g", ref_g)
+    print ("ref_t", ref_t)
+    print ("annot", annot)
+    print ("aligner", aligner)
+    print ("alignment_genome", g_alnm)
+    print ("alignment_transcriptome", t_alnm)
+    print ("outfile", outfile)
+    print ("model_fit", model_fit)
+    print ("num_bins", num_bins)
 
     if infile == '' or ref_g == '' or ref_t == '' or annot == '':
         print("Please specify the training reads and its reference genome and transcriptome along with the annotation GTF/GFF3 files!")
@@ -167,14 +147,15 @@ def main():
     annot_filename, annot_file_extension = os.path.splitext(annot)
     annot_file_extension = annot_file_extension[1:]
     if annot_file_extension.upper() == "GTF":
-        call("gt gtf_to_gff3 -tidy -o " + annot_filename + ".gff3" + annot, shell=True)
+        call("gt gtf_to_gff3 -tidy -o " + outfile + ".gff3" + annot, shell=True)
 
     # Next, add intron info into gff3:
-    call("gt gff3 -tidy -retainids -checkids -addintrons -o " + annot_filename + "_addedintron.gff3 " + annot_filename + ".gff3", shell=True)
+    call("gt gff3 -tidy -retainids -checkids -addintrons -o " + outfile + "_addedintron.gff3 " + annot_filename + ".gff3", shell=True)
 
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read the intron coordinates to dictionary\n")
     features = HTSeq.GenomicArrayOfSets("auto", stranded=False)
     dict_intron_info = {}
-    annot_gff3_withintron = annot_filename + "_addedintron.gff3"
+    annot_gff3_withintron = outfile + "_addedintron.gff3"
     gff_file = HTSeq.GFF_Reader(annot_gff3_withintron, end_included=True)
     for feature in gff_file:
         if "Parent" in feature.attr:
@@ -187,6 +168,7 @@ def main():
             features[feature.iv] += feature_id
             dict_intron_info[feature_id].append((feature.iv.start, feature.iv.end, feature.iv.length))
 
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read the length of reference transcripts \n")
     #Read the length of reference transcripts from the reference transcriptome
     dict_ref_len = {}
     with open (ref_t) as f:
@@ -238,7 +220,7 @@ def main():
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
             call("minimap2 --cs -ax splice " + ref_t + " " + in_fasta + " > " + outsam_t, shell=True)
 
-            unaligned_length = list(get_primary_sam.primary_and_unaligned(outsam_t, outfile))
+            unaligned_length = list(get_primary_sam.primary_and_unaligned(outsam_g, outsam_t, outfile))
 
         elif aligner == "LAST":
             g_alnm_ext = "maf"
@@ -264,7 +246,7 @@ def main():
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reads length distribution analysis\n")
     # Aligned reads length distribution analysis
-    count_aligned = align.head_align_tail(outfile, num_bins, dict_ref_len, t_alnm_ext)
+    count_aligned = align.head_align_tail(outfile, num_bins, t_alnm_ext, dict_ref_len)
 
     # Unaligned reads length distribution analysis
     out1 = open(outfile + "_unaligned_length_ecdf", 'w')
