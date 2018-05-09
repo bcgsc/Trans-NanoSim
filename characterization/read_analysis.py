@@ -73,11 +73,11 @@ def main():
     parser.add_argument('-rg', '--ref_g', help='Reference genome.', required=True)
     parser.add_argument('-rt', '--ref_t', help='Reference Transcriptome.', required=True)
     parser.add_argument('-annot', '--annot', help='Annotation file in ensemble GTF/GFF formats.', required=True)
-    parser.add_argument('-a', '--aligner', help='The aligner to be used minimap2 or last (Default = minimap2)')
+    parser.add_argument('-a', '--aligner', help='The aligner to be used minimap2 or LAST (Default = minimap2)')
     parser.add_argument('-ga', '--g_alnm', help='Genome alignment file in sam or maf format (optional)')
     parser.add_argument('-ta', '--t_alnm', help='Transcriptome alignment file in sam or maf format (optional)')
     parser.add_argument('-o', '--output', help='The output name and location for profiles')
-    parser.add_argument('-mf', '--model_fit', help='Enable/disable model fitting step')
+    parser.add_argument('--no_model_fit', help='Disable model fitting step', action='store_true')
     parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)')
 
     args = parser.parse_args()
@@ -92,8 +92,10 @@ def main():
         g_alnm = args.g_alnm
     if args.t_alnm:
         t_alnm = args.t_alnm
-    outfile = args.output
-    model_fit = args.model_fit
+    if args.output:
+        outfile = args.output
+    if args.no_model_fit:
+        model_fit = False
     if args.num_bins:
         num_bins = max(args.num_bins, 1)
 
@@ -114,8 +116,8 @@ def main():
         usage()
         sys.exit(1)
 
-    if aligner != '' and (alignment_genome != '' or alignment_transcriptome != ''):
-        print("Please specify either an alignment file (-ga and -ta ) OR an aligner to use for alignment (-a )")
+    if aligner != '' and (g_alnm != '' or t_alnm != ''):
+        print("Please specify either an alignment files (-ga and -ta ) OR an aligner to use for alignment (-a )")
         usage()
         sys.exit(1)
 
@@ -272,16 +274,16 @@ def main():
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")
         #path = sys.argv[0].split("/")
         #r_path = '/'.join(path[:-1]) + '/' + "model_fitting.R"
-        r_path = '/projects/btl/shafez/trans_nanosim/trans_nanosim-master/src/model_fitting.R'
+        r_path = '/projects/btl/shafez/trans_nanosim/trans_nanosim_dev/characterization/model_fitting.R'
         if os.path.isfile(r_path):
             call("R CMD BATCH '--args prefix=\"" + outfile + "\"' " + r_path, shell=True)
         else:
             sys.stderr.write("Could not find 'model_fitting.R' in ../src/\n" +
                   "Make sure you copied the whole source files from Github.")
 
+    call ("find . -name \*.pyc -delete", shell=True)
+    call("find . -name \*.Rout -delete", shell=True)
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
-
-
 
 if __name__ == "__main__":
     main()
