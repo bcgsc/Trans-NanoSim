@@ -8,6 +8,7 @@ Major changes from NanoSim to use minimap output sam file and also develop 2d le
 
 from __future__ import with_statement
 import sys
+import HTSeq
 import getopt
 import numpy
 import matplotlib.pyplot as plt
@@ -76,12 +77,14 @@ def get_head_tail(cigar_string):
 
 def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
 
-    out1 = open(outfile + '_read_rellen_ecdf', 'w')
-    out2 = open(outfile + '_read_totallen_ecdf', 'w')
-    out3 = open(outfile + '_ht_ratio', 'w')
-    out4 = open(outfile + "_align_ratio", 'w')
-    out5 = open(outfile + "_unaligned_length_ecdf", "w")
+    out1 = open(outfile + "_read_rellen_ecdf", "w")
+    out2 = open(outfile + "_read_totallen_ecdf", "w")
+    out3 = open(outfile + "_ht_ratio", "w")
+    out4 = open(outfile + "_align_ratio", "w")
 
+    out5 = open(outfile + "_reflen_total_ecdf", "w") #Just for testing.
+
+    ref_total = [] #just for testing
     aligned = [] # we do not need this in TransNanoSim but I am just including for test.
     total = []
     list_ref_len = []
@@ -95,7 +98,7 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
 
     if alnm_ftype == "sam":
         sam_reader = HTSeq.SAM_Reader
-        alnm_file_sam = outfile + "_primary.sam"
+        alnm_file_sam = outfile + "_transcriptome_alnm_primary.sam"
         t_alignments = sam_reader(alnm_file_sam)
         for alnm in t_alignments:
             if alnm.aligned:
@@ -103,6 +106,7 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
 
                 ref = alnm.iv.chrom
                 ref_len = dict_ref_len[ref]
+                ref_total.append(ref_len)
                 ref_aligned = alnm.iv.length
                 aligned.append(ref_aligned)
 
@@ -134,8 +138,8 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
                     dict_rellen[ref_len].append(relative_length)
 
 
-    else:
-        besthit_out = outfile + "_besthit.maf"
+    elif alnm_ftype == "maf":
+        besthit_out = outfile + "_transcriptome_alnm_besthit.maf"
         with open(besthit_out, 'r') as f:
             for line in f:
                 ref_line = line
@@ -145,6 +149,7 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
                 ref = ref_line.strip().split()
                 ref_aligned = int(ref[3])
                 ref_len = dict_ref_len[ref[1]]
+                ref_total.append(ref_len)
                 aligned.append(ref_aligned)
 
                 query = query_line.strip().split()
@@ -191,7 +196,7 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
 
 
 
-    # ecdf of length of aligned reads
+    # ecdf of total length of reads
     max_length = max(total)
     hist_reads, bin_edges = numpy.histogram(total, bins=numpy.arange(0, max_length + 50, 50), density=True)
     cdf = numpy.cumsum(hist_reads * 50)
@@ -235,6 +240,16 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
             out4.write(str(align_cum[key][i]) + "\t")
         out4.write("\n")
     out4.close()
+
+
+    # ecdf of total length of reference transcripts
+    max_length = max(ref_total)
+    hist_reads, bin_edges = numpy.histogram(ref_total, bins=numpy.arange(0, max_length + 50, 50), density=True)
+    cdf = numpy.cumsum(hist_reads * 50)
+    out5.write("bin\t0-" + str(max_length) + '\n')
+    for i in xrange(len(cdf)):
+        out5.write(str(bin_edges[i]) + '-' + str(bin_edges[i + 1]) + "\t" + str(cdf[i]) + '\n')
+    out5.close()
 
 
     return count_aligned
