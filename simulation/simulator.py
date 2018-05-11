@@ -11,6 +11,7 @@ This script generates simulated Oxford Nanopore 2D transcriptome reads.
 from __future__ import print_function
 from __future__ import with_statement
 import sys
+sys.path.insert(0, '/projects/btl/shafez/trans_nanosim/trans_nanosim_dev/characterization')
 import glob
 import getopt
 import random
@@ -43,8 +44,6 @@ BASES = ['A', 'T', 'C', 'G']
 # Usage information
 def usage():
     usage_message = "./simulator.py [command] <options>\n" \
-                    "[command] circular | linear\n" \
-                    "Do not choose 'circular' when there is more than one sequence in the reference\n" \
                     "<options>: \n" \
                     "-h : print usage message\n" \
                     "-r : reference genome in fasta file, specify path and file name, REQUIRED\n" \
@@ -185,7 +184,7 @@ def get_length_ratio(dict_ratio, len_ref):
                     r = (p - k_r[0]) / (k_r[1] - k_r[0]) * (v_r[1] - v_r[0]) + v_r[0]
                     ref_aligned = int(round(len_ref * r))
                     break
-    return item, ref_aligned
+            return item, ref_aligned
 
 
 def get_length_2d(len_dict, len_ref, max_l, min_l):
@@ -250,7 +249,7 @@ def get_length(len_dict, num, max_l, min_l):
 
 
 def read_profile(number, model_prefix, per, max_l, min_l):
-    global unaligned_length, number_aligned, aligned_dict
+    global unaligned_length, number_aligned, aligned_dict, reftotal_dict
     global first_match_hist, align_ratio, ht_dict, error_model_profile
     global error_markov_model, match_markov_model
 
@@ -329,6 +328,10 @@ def read_profile(number, model_prefix, per, max_l, min_l):
         aligned_dict = read_ecdf(align_profile)
 
 
+    with open(model_prefix + "_reflen_total_ecdf", "r") as reftotal_profile:
+        reftotal_dict = read_ecdf(reftotal_profile)
+
+
 def collapse_homo(seq, k):
     read = re.sub("A" * k + "+", "A" * (k - 1), seq)
     read = re.sub("C" * k + "+", "C" * (k - 1), read)
@@ -373,8 +376,8 @@ def readfq(fp):  # this is a generator function
                 break
 
 
-def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
-    global unaligned_length, number_aligned, aligned_dict
+def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
+    global unaligned_length, number_aligned, aligned_dict, reftotal_dict
     global genome_len, seq_dict, seq_len, dict_exp, ecdf_dict_ref
     global first_match_hist, align_ratio, ht_dict, match_markov_model
     global error_markov_model, error_model_profile
@@ -407,8 +410,8 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
         for line in exp_file:
             parts = line.split("\t")
             transcript_id = parts[0]
-            tpm = float(parts[3])
-            if transcript_id.startswith("ENS") and tpm >= 2:
+            tpm = float(parts[2])
+            if transcript_id.startswith("ENS") and tpm > 0:
                 dict_exp[transcript_id] = tpm
 
     #create the ecdf dict considering the expression profiles
@@ -422,6 +425,8 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
     out_error.write("Seq_name\tSeq_pos\terror_type\terror_length\tref_base\tseq_base\n")
 
     # Simulate unaligned reads
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of unaligned reads\n")
+    sys.stdout.flush()
     num_unaligned_length = len(unaligned_length)
     for i in xrange(num_unaligned_length):
         unaligned = unaligned_length[i]
@@ -479,6 +484,7 @@ def simulation(ref, out, dna_type, per, kmer_bias, max_l, min_l, exp):
         while True:
             #pick a reference to simulate a read out of it.
             ref_len_total = max(50, select_ref_transcript(ecdf_dict_ref_exp))
+            #ref_len_total = get_length(reftotal_dict, 1, max_l, min_l)[0] # just for testing
             #get the align region ratio out of this ref len total
             key_range, ref_len_aligned = get_length_ratio(aligned_dict, ref_len_total)
             if ref_len_aligned != 0:
@@ -802,7 +808,8 @@ def main():
     kmer_bias = 0
 
     # Parse options and parameters
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 3:
+        print ("error is here 111")
         usage()
         sys.exit(1)
     else:
@@ -810,9 +817,11 @@ def main():
             opts, args = getopt.getopt(sys.argv[1:], "hr:e:c:o:n:i:d:m:",
                                        ["max_len=", "min_len=", "perfect", "KmerBias="])
         except getopt.GetoptError:
+            print ("error is here 222")
             usage()
             sys.exit(1)
         for opt, arg in opts:
+            print (opt, arg)
             if opt == "-r":
                 ref = arg
             elif opt == "-e":
@@ -841,6 +850,7 @@ def main():
                 usage()
                 sys.exit(0)
             else:
+                print ("error in here !!!")
                 usage()
                 sys.exit(1)
 
@@ -855,8 +865,10 @@ def main():
         usage()
         sys.exit(1)
 
-    if exp == "":
-        print("must provide an expression profile for this reference transcriptome")
+    #if exp == "":
+        #print("must provide an expression profile for this reference transcriptome")
+        #usage()
+        #sys.exit(1)
 
     if max_readlength < min_readlength:
         print("maximum read length must be longer than minimum read length!")
@@ -865,7 +877,7 @@ def main():
     # Read in reference transcriptome and generate simulated reads
     read_profile(number, model_prefix, perfect, max_readlength, min_readlength)
 
-    simulation(ref, out, dna_type, perfect, kmer_bias, max_readlength, min_readlength, exp)
+    simulation(ref, out, perfect, kmer_bias, max_readlength, min_readlength, exp)
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!")
     sys.stdout.close()
