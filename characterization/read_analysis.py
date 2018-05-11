@@ -217,7 +217,7 @@ def main():
             outsam_t = outfile + "_transcriptome_alnm.sam"
             # Alignment to reference genome
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference genome\n")
-            call("minimap2 --cs --MD -ax map-ont " + ref_g + " " + in_fasta + " > " + outsam_g, shell=True)
+            call("minimap2 --cs -ax splice " + ref_g + " " + in_fasta + " > " + outsam_g, shell=True)
             # Alignment to reference transcriptome
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
             call("minimap2 --cs -ax splice " + ref_t + " " + in_fasta + " > " + outsam_t, shell=True)
