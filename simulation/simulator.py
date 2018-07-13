@@ -30,7 +30,7 @@ try:
 except ImportError:
     sys.exit("""You need numpy!
                 install it from http://www.numpy.org/""")
-import mixed_models as mm
+import mixed_model as mm
 
 PYTHON_VERSION = sys.version_info
 VERSION = "1.0.0"
@@ -684,7 +684,7 @@ def error_list(m_ref, m_model, m_ht_list, error_p, trans_p):
                 break
 
         if error == "mis":
-            step = mm.pois_geom(error_p["mis"][0], error_p["mis"][2], error_p["mis"][3])
+            step = mm.pois_geom(error_p[error][0], error_p[error][2], error_p[error][3])
         elif error == "ins":
             step = mm.wei_geom(error_p[error][0], error_p[error][1], error_p[error][2], error_p[error][3])
             l_new += step

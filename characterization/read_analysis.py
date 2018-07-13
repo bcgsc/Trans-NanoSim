@@ -29,7 +29,7 @@ import head_align_tail_dist as align
 import get_besthit_maf
 import get_primary_sam
 import besthit_to_histogram as error_model
-
+import model_fitting
 
 
 # Usage information
@@ -272,14 +272,7 @@ def main():
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")
-        #path = sys.argv[0].split("/")
-        #r_path = '/'.join(path[:-1]) + '/' + "model_fitting.R"
-        r_path = '/projects/btl/shafez/trans_nanosim/trans_nanosim_dev/characterization/model_fitting.R'
-        if os.path.isfile(r_path):
-            call("R CMD BATCH '--args prefix=\"" + outfile + "\"' " + r_path, shell=True)
-        else:
-            sys.stderr.write("Could not find 'model_fitting.R' in ../src/\n" +
-                  "Make sure you copied the whole source files from Github.")
+        model_fitting.model_fitting(prefix, int(num_threads))
 
     call ("find . -name \*.pyc -delete", shell=True)
     call ("find . -name \*.Rout -delete", shell=True)
