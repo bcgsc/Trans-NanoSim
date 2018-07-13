@@ -5,7 +5,7 @@ Created on March 2018
 
 @author: Saber HafezQorani
 
-This script generates read profiles from Oxford Nanopore 2D transcriptome reads.
+This script generates read profiles from Oxford Nanopore cDNA/dRNA transcriptome reads.
 
 """
 
@@ -54,15 +54,15 @@ def main():
 
     # Parse input and output files
     infile = ''
-    outfile = 'training'
+    #outfile = 'training'
     ref_g = ''
     ref_t = ''
     annot = ''
-    aligner = ''
+    #aligner = ''
     g_alnm = ''
     t_alnm = ''
     model_fit = True
-    num_bins = 20
+    #num_bins = 20
 
     parser = argparse.ArgumentParser(
         description='Given the read profiles from characterization step, ' \
@@ -73,12 +73,12 @@ def main():
     parser.add_argument('-rg', '--ref_g', help='Reference genome.', required=True)
     parser.add_argument('-rt', '--ref_t', help='Reference Transcriptome.', required=True)
     parser.add_argument('-annot', '--annot', help='Annotation file in ensemble GTF/GFF formats.', required=True)
-    parser.add_argument('-a', '--aligner', help='The aligner to be used minimap2 or LAST (Default = minimap2)')
+    parser.add_argument('-a', '--aligner', help='The aligner to be used minimap2 or LAST (Default = minimap2)', defaul = "minimap2")
     parser.add_argument('-ga', '--g_alnm', help='Genome alignment file in sam or maf format (optional)')
     parser.add_argument('-ta', '--t_alnm', help='Transcriptome alignment file in sam or maf format (optional)')
-    parser.add_argument('-o', '--output', help='The output name and location for profiles')
+    parser.add_argument('-o', '--output', help='The output name and location for profiles', default = "training")
     parser.add_argument('--no_model_fit', help='Disable model fitting step', action='store_true')
-    parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)')
+    parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)', default = 20)
 
     args = parser.parse_args()
 
@@ -210,7 +210,7 @@ def main():
             unaligned_length = list(get_primary_sam.primary_and_unaligned(t_alnm, outfile))
 
     else:
-        if aligner == "minimap2" or aligner == "":  # Align with minimap2 by default
+        if aligner == "minimap2":  # Align with minimap2 by default
             g_alnm_ext = "sam"
             t_alnm_ext = "sam"
             outsam_g = outfile + "_genome_alnm.sam"
@@ -222,7 +222,7 @@ def main():
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
             call("minimap2 --cs -ax splice " + ref_t + " " + in_fasta + " > " + outsam_t, shell=True)
 
-            unaligned_length = list(get_primary_sam.primary_and_unaligned(outsam_g, outsam_t, outfile))
+            unaligned_length = list(get_primary_sam.primary_and_unaligned(outsam_t, outfile))
 
         elif aligner == "LAST":
             g_alnm_ext = "maf"
@@ -282,7 +282,7 @@ def main():
                   "Make sure you copied the whole source files from Github.")
 
     call ("find . -name \*.pyc -delete", shell=True)
-    call("find . -name \*.Rout -delete", shell=True)
+    call ("find . -name \*.Rout -delete", shell=True)
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
 
 if __name__ == "__main__":
