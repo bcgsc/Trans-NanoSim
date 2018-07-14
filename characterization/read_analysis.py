@@ -222,6 +222,7 @@ def main():
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
             call("minimap2 --cs -ax splice " + ref_t + " " + in_fasta + " > " + outsam_t, shell=True)
 
+            # [EDIT] I may add a script to remove minimap2/LAST post-alignment files after alignment.
             unaligned_length = list(get_primary_sam.primary_and_unaligned(outsam_t, outfile))
 
         elif aligner == "LAST":
@@ -275,7 +276,6 @@ def main():
         model_fitting.model_fitting(prefix, int(num_threads))
 
     call ("find . -name \*.pyc -delete", shell=True)
-    call ("find . -name \*.Rout -delete", shell=True)
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
 
 if __name__ == "__main__":
