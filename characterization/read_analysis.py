@@ -62,6 +62,7 @@ def main():
     g_alnm = ''
     t_alnm = ''
     model_fit = True
+    #num_threads = '1'
     #num_bins = 20
 
     parser = argparse.ArgumentParser(
@@ -79,6 +80,7 @@ def main():
     parser.add_argument('-o', '--output', help='The output name and location for profiles', default = "training")
     parser.add_argument('--no_model_fit', help='Disable model fitting step', action='store_true')
     parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)', default = 20)
+    parser.add_argument('-t', '--num_threads', help='Number of threads to be used in alignments and model fitting (Default = 1)', default=1)
 
     args = parser.parse_args()
 
@@ -98,6 +100,8 @@ def main():
         model_fit = False
     if args.num_bins:
         num_bins = max(args.num_bins, 1)
+    if args.num_threads:
+        num_threads = max(int(args.num_threads), 1)
 
     print ("Running the characterization step with following arguments: \n")
     print ("infile", infile)
@@ -233,11 +237,11 @@ def main():
             # Alignment to reference genome
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with LAST to reference genome\n")
             call("lastdb ref_genome " + ref_g, shell=True)
-            call("lastal -a 1 ref_genome " + in_fasta + " | grep '^s ' > " + outmaf_g, shell=True)
+            call("lastal -a 1 -P " + num_threads + " ref_genome " + in_fasta + " | grep '^s ' > " + outmaf_g, shell=True)
             # Alignment to reference transcriptome
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with LAST to reference transcriptome\n")
             call("lastdb ref_transcriptome " + ref_t, shell=True)
-            call("lastal -a 1 ref_transcriptome " + in_fasta + " | grep '^s ' > " + outmaf_t, shell=True)
+            call("lastal -a 1 -P " + num_threads + " ref_transcriptome " + in_fasta + " | grep '^s ' > " + outmaf_t, shell=True)
 
             unaligned_length = list(get_besthit_maf.besthit_and_unaligned(in_fasta, outmaf_t, outfile))
 
