@@ -84,6 +84,10 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
 
     out5 = open(outfile + "_reflen_total_ecdf", "w") #Just for testing.
 
+    out6 = open(outfile + "_head_sequences", "w")
+    out7 = open(outfile + "_tail_sequences", "w")
+
+
     ref_total = [] #just for testing
     aligned = [] # we do not need this in TransNanoSim but I am just including for test.
     total = []
@@ -114,6 +118,9 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
                 total.append(read_len_total)
                 head, tail = get_head_tail(alnm.cigar)
                 middle = read_len_total - head - tail
+
+                out6.write(alnm.read.seq[:head] + "\n")
+                out7.write(alnm.read.seq[-tail:] + "\n")
 
                 #ratio aligned part over total length of the read
                 alignment_ratio = float(middle) / read_len_total
@@ -251,5 +258,7 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
         out5.write(str(bin_edges[i]) + '-' + str(bin_edges[i + 1]) + "\t" + str(cdf[i]) + '\n')
     out5.close()
 
+    out6.close()
+    out7.close()
 
     return count_aligned

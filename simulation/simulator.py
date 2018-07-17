@@ -252,7 +252,7 @@ def read_profile(number, model_prefix, per, max_l, min_l):
     global unaligned_length, number_aligned, aligned_dict, reftotal_dict
     global first_match_hist, align_ratio, ht_dict, error_model_profile
     global error_markov_model, match_markov_model
-
+    global dict_head, dict_tail
 
     # Read model profile for match, mismatch, insertion and deletions
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read error profile\n")
@@ -331,6 +331,26 @@ def read_profile(number, model_prefix, per, max_l, min_l):
     with open(model_prefix + "_reflen_total_ecdf", "r") as reftotal_profile:
         reftotal_dict = read_ecdf(reftotal_profile)
 
+    with open(model_prefix + "_head_sequences", "r") as f_head:
+        for line in f_head:
+            hseq = line.strip("\n")
+            if len(hseq) not in dict_head:
+                dict_head[len(hseq)] = [hseq]
+            else:
+                dict_head[len(hseq)].append(hseq)
+
+    with open(model_prefix + "_tail_sequences", "r") as f_tail:
+        for line in f_tail:
+            tseq = line.strip("\n")
+            if len(tseq) not in dict_tail:
+                dict_tail[len(tseq)] = [tseq]
+            else:
+                dict_tail[len(tseq)].append(tseq)
+
+
+def get_ht_sequence(dict_ht, length):
+    return random.choice(dict_ht[length])
+
 
 def collapse_homo(seq, k):
     read = re.sub("A" * k + "+", "A" * (k - 1), seq)
@@ -381,6 +401,7 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
     global genome_len, seq_dict, seq_len, dict_exp, ecdf_dict_ref
     global first_match_hist, align_ratio, ht_dict, match_markov_model
     global error_markov_model, error_model_profile
+    global dict_head, dict_tail
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read in reference transcriptome (length and expression)\n")
     sys.stdout.flush()
@@ -552,9 +573,34 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
         else:
             new_read_name += "_F"
         # Add head and tail region
-        read_mutated = ''.join(np.random.choice(BASES, head)) + read_mutated
+        #read_mutated = ''.join(np.random.choice(BASES, head)) + read_mutated
 
-        read_mutated += ''.join(np.random.choice(BASES, tail))
+        #read_mutated += ''.join(np.random.choice(BASES, tail))
+
+        if head != 0:
+            while True:
+                try:
+                    head_sequence = get_ht_sequence(dict_head, head)
+                    break
+                except:
+                    head += 1
+        else:
+            head_sequence = ""
+
+
+
+        if tail != 0:
+            while True:
+                try:
+                    tail_sequence = get_ht_sequence(dict_tail, tail)
+                    break
+                except:
+                    tail += 1
+        else:
+            tail_sequence = ""
+
+        read_mutated = head_sequence + read_mutated
+        read_mutated += tail_sequence
 
         if kmer_bias:
             read_mutated = collapse_homo(read_mutated, kmer_bias)
@@ -564,7 +610,6 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
         out_reads.write(read_mutated + '\n')
 
         i += 1
-
 
 
     out_reads.close()

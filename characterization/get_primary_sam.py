@@ -22,7 +22,7 @@ def primary_and_unaligned(g_alnm, t_alnm, outfile):
     for alnm in g_alignments:
         out1.write(alnm.original_sam_line)
 
-    unaligned_dict = []
+    unaligned_list = []
     t_alignments = sam_reader(t_alnm)
     for alnm in t_alignments:
         out2.write(alnm.original_sam_line)
@@ -30,9 +30,9 @@ def primary_and_unaligned(g_alnm, t_alnm, outfile):
             if not alnm.not_primary_alignment and not alnm.supplementary:
                 out3.write(alnm.original_sam_line)
         else:
-            unaligned_dict.append(len(alnm.read.seq))
+            unaligned_list.append(len(alnm.read.seq))
 
     out1.close()
     out2.close()
     out3.close()
-    return unaligned_dict
+    return unaligned_list
