@@ -54,16 +54,12 @@ def main():
 
     # Parse input and output files
     infile = ''
-    #outfile = 'training'
     ref_g = ''
     ref_t = ''
     annot = ''
-    #aligner = ''
     g_alnm = ''
     t_alnm = ''
     model_fit = True
-    #num_threads = '1'
-    #num_bins = 20
 
     parser = argparse.ArgumentParser(
         description='Given the read profiles from characterization step, ' \
@@ -74,7 +70,7 @@ def main():
     parser.add_argument('-rg', '--ref_g', help='Reference genome.', required=True)
     parser.add_argument('-rt', '--ref_t', help='Reference Transcriptome.', required=True)
     parser.add_argument('-annot', '--annot', help='Annotation file in ensemble GTF/GFF formats.', required=True)
-    parser.add_argument('-a', '--aligner', help='The aligner to be used minimap2 or LAST (Default = minimap2)', defaul = "minimap2")
+    parser.add_argument('-a', '--aligner', help='The aligner to be used minimap2 or LAST (Default = minimap2)', default = 'minimap2')
     parser.add_argument('-ga', '--g_alnm', help='Genome alignment file in sam or maf format (optional)')
     parser.add_argument('-ta', '--t_alnm', help='Transcriptome alignment file in sam or maf format (optional)')
     parser.add_argument('-o', '--output', help='The output name and location for profiles', default = "training")
@@ -101,7 +97,7 @@ def main():
     if args.num_bins:
         num_bins = max(args.num_bins, 1)
     if args.num_threads:
-        num_threads = max(int(args.num_threads), 1)
+        num_threads = max(args.num_threads, 1)
 
     print ("Running the characterization step with following arguments: \n")
     print ("infile", infile)
@@ -114,14 +110,18 @@ def main():
     print ("outfile", outfile)
     print ("model_fit", model_fit)
     print ("num_bins", num_bins)
+    print ("num_threads", num_threads)
 
+    '''
+    #It is already taken care of with args.parser required option)
     if infile == '' or ref_g == '' or ref_t == '' or annot == '':
         print("Please specify the training reads and its reference genome and transcriptome along with the annotation GTF/GFF3 files!")
         usage()
         sys.exit(1)
+    '''
 
-    if aligner != '' and (g_alnm != '' or t_alnm != ''):
-        print("Please specify either an alignment files (-ga and -ta ) OR an aligner to use for alignment (-a )")
+    if (g_alnm != '' or t_alnm == '') or (g_alnm == '' or t_alnm != ''):
+        print("Please specify either both alignment files (-ga and -ta) OR an aligner to use for alignment (-a)")
         usage()
         sys.exit(1)
 
@@ -211,23 +211,25 @@ def main():
 
         elif t_alnm_ext == "sam":
 
-            unaligned_length = list(get_primary_sam.primary_and_unaligned(t_alnm, outfile))
+            unaligned_length = list(get_primary_sam.primary_and_unaligned(g_alnm, t_alnm, outfile))
 
     else:
-        if aligner == "minimap2":  # Align with minimap2 by default
+        if aligner == "minimap2" or aligner == "":  # Align with minimap2 by default
             g_alnm_ext = "sam"
             t_alnm_ext = "sam"
             outsam_g = outfile + "_genome_alnm.sam"
             outsam_t = outfile + "_transcriptome_alnm.sam"
             # Alignment to reference genome
+
+            # [EDIT] I should change the options for minimap when dealing with cDNA and dRNA reads.
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference genome\n")
-            call("minimap2 --cs -ax splice " + ref_g + " " + in_fasta + " > " + outsam_g, shell=True)
+            call("minimap2 -ax splice " + ref_g + " " + in_fasta + " > " + outsam_g, shell=True)
             # Alignment to reference transcriptome
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Alignment with minimap2 to reference transcriptome\n")
-            call("minimap2 --cs -ax splice " + ref_t + " " + in_fasta + " > " + outsam_t, shell=True)
+            call("minimap2 --cs -ax map-ont " + ref_t + " " + in_fasta + " > " + outsam_t, shell=True)
 
             # [EDIT] I may add a script to remove minimap2/LAST post-alignment files after alignment.
-            unaligned_length = list(get_primary_sam.primary_and_unaligned(outsam_t, outfile))
+            unaligned_length = list(get_primary_sam.primary_and_unaligned(outsam_g, outsam_t, outfile))
 
         elif aligner == "LAST":
             g_alnm_ext = "maf"
@@ -277,9 +279,11 @@ def main():
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")
-        model_fitting.model_fitting(prefix, int(num_threads))
+        model_fitting.model_fitting(outfile, int(num_threads))
 
-    call ("find . -name \*.pyc -delete", shell=True)
+    call("find . -name \*ref_genome.* -delete", shell=True)
+    call("find . -name \*ref_transcriptome.* -delete", shell=True)
+    call("find . -name \*.pyc -delete", shell=True)
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
 
 if __name__ == "__main__":
