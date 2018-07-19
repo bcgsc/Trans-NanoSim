@@ -11,12 +11,13 @@ This script generates simulated Oxford Nanopore 2D transcriptome reads.
 from __future__ import print_function
 from __future__ import with_statement
 import sys
-sys.path.insert(0, '/projects/btl/shafez/trans_nanosim/trans_nanosim_dev/characterization')
+#sys.path.insert(0, '/projects/btl/shafez/trans_nanosim/trans_nanosim_dev/characterization')
 import glob
 import getopt
 import random
 import numpy
 import time
+from time import sleep
 import operator
 import re
 from time import strftime
@@ -331,6 +332,7 @@ def read_profile(number, model_prefix, per, max_l, min_l):
     with open(model_prefix + "_reflen_total_ecdf", "r") as reftotal_profile:
         reftotal_dict = read_ecdf(reftotal_profile)
 
+    dict_head = {}
     with open(model_prefix + "_head_sequences", "r") as f_head:
         for line in f_head:
             hseq = line.strip("\n")
@@ -339,6 +341,7 @@ def read_profile(number, model_prefix, per, max_l, min_l):
             else:
                 dict_head[len(hseq)].append(hseq)
 
+    dict_tail = {}
     with open(model_prefix + "_tail_sequences", "r") as f_tail:
         for line in f_tail:
             tseq = line.strip("\n")
@@ -450,6 +453,10 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
     sys.stdout.flush()
     num_unaligned_length = len(unaligned_length)
     for i in xrange(num_unaligned_length):
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Number of reads simulated >> " + str(i) + "\r")
+        sys.stdout.flush()
+        sleep(0.02)
+
         unaligned = unaligned_length[i]
         unaligned, error_dict = unaligned_error_list(unaligned, error_model_profile)
         new_read, new_read_name = extract_read(unaligned)
@@ -502,6 +509,9 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
 
     i = 0
     while i < number_aligned:
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Number of reads simulated >> " + str(i + num_unaligned_length) + "\r")
+        sys.stdout.flush()
+        sleep(0.02)
         while True:
             #pick a reference to simulate a read out of it.
             ref_len_total = max(50, select_ref_transcript(ecdf_dict_ref_exp))
@@ -572,30 +582,17 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
             new_read_name += "_R"
         else:
             new_read_name += "_F"
-        # Add head and tail region
-        #read_mutated = ''.join(np.random.choice(BASES, head)) + read_mutated
 
-        #read_mutated += ''.join(np.random.choice(BASES, tail))
-
+        #Add head and tail sequences
         if head != 0:
-            while True:
-                try:
-                    head_sequence = get_ht_sequence(dict_head, head)
-                    break
-                except:
-                    head += 1
+            nearest_head = min(dict_head, key=lambda x: abs(x - head))
+            head_sequence = get_ht_sequence(dict_head, nearest_head)
         else:
             head_sequence = ""
 
-
-
         if tail != 0:
-            while True:
-                try:
-                    tail_sequence = get_ht_sequence(dict_tail, tail)
-                    break
-                except:
-                    tail += 1
+            nearest_tail = min(dict_tail, key=lambda x: abs(x - tail))
+            tail_sequence = get_ht_sequence(dict_tail, nearest_tail)
         else:
             tail_sequence = ""
 
