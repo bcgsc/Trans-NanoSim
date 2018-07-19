@@ -112,15 +112,8 @@ def main():
     print ("num_bins", num_bins)
     print ("num_threads", num_threads)
 
-    '''
-    #It is already taken care of with args.parser required option)
-    if infile == '' or ref_g == '' or ref_t == '' or annot == '':
-        print("Please specify the training reads and its reference genome and transcriptome along with the annotation GTF/GFF3 files!")
-        usage()
-        sys.exit(1)
-    '''
 
-    if (g_alnm != '' or t_alnm == '') or (g_alnm == '' or t_alnm != ''):
+    if (g_alnm != '' and t_alnm == '') or (g_alnm == '' and t_alnm != ''):
         print("Please specify either both alignment files (-ga and -ta) OR an aligner to use for alignment (-a)")
         usage()
         sys.exit(1)
