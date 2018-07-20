@@ -117,6 +117,15 @@ def main():
         print("Please specify either both alignment files (-ga and -ta) OR an aligner to use for alignment (-a)")
         usage()
         sys.exit(1)
+    if g_alnm != "" and t_alnm != "":
+        g_alnm_filename, g_alnm_ext = os.path.splitext(g_alnm)
+        t_alnm_filename, t_alnm_ext = os.path.splitext(t_alnm)
+        g_alnm_ext = g_alnm_ext [1:]
+        t_alnm_ext = t_alnm_ext[1:]
+        if g_alnm_ext != t_alnm_ext:
+            print("Please provide both alignments in a same format: sam OR maf\n")
+            usage()
+            sys.exit(1)
 
     # READ PRE-PROCESS AND UNALIGNED READS ANALYSIS
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read pre-process and unaligned reads analysis\n")
@@ -180,15 +189,15 @@ def main():
 
     #If both alignment files are provided:
     if g_alnm != "" and t_alnm != "":
-        g_alnm_filename, g_alnm_ext = os.path.splitext(g_alnm)
-        t_alnm_filename, t_alnm_ext = os.path.splitext(t_alnm)
-        g_alnm_ext = g_alnm_ext [1:]
-        t_alnm_ext = t_alnm_ext[1:]
-        if g_alnm_ext != t_alnm_ext:
-            print("Please provide both alignments in a same format: sam OR maf\n")
-            usage()
-            sys.exit(1)
-        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Processing the alignment files: " + g_alnm_ext + "\n")
+        # g_alnm_filename, g_alnm_ext = os.path.splitext(g_alnm)
+        # t_alnm_filename, t_alnm_ext = os.path.splitext(t_alnm)
+        # g_alnm_ext = g_alnm_ext [1:]
+        # t_alnm_ext = t_alnm_ext[1:]
+        # if g_alnm_ext != t_alnm_ext:
+        #     print("Please provide both alignments in a same format: sam OR maf\n")
+        #     usage()
+        #     sys.exit(1)
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Processing the alignment files: " + t_alnm_ext + "\n")
         if t_alnm_ext == "maf":
             outmaf_g = outfile + "_genome_alnm.maf"
             outmaf_t = outfile + "_transcriptome_alnm.maf"
@@ -207,7 +216,7 @@ def main():
             unaligned_length = list(get_primary_sam.primary_and_unaligned(g_alnm, t_alnm, outfile))
 
     else:
-        if aligner == "minimap2" or aligner == "":  # Align with minimap2 by default
+        if aligner == "minimap2":
             g_alnm_ext = "sam"
             t_alnm_ext = "sam"
             outsam_g = outfile + "_genome_alnm.sam"
