@@ -11,7 +11,6 @@ This script generates simulated Oxford Nanopore 2D transcriptome reads.
 from __future__ import print_function
 from __future__ import with_statement
 import sys
-#sys.path.insert(0, '/projects/btl/shafez/trans_nanosim/trans_nanosim_dev/characterization')
 import glob
 import getopt
 import random
@@ -419,10 +418,10 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
             info = re.split(r'[_\s]\s*', seqN)
             transcript_id = "-".join(info)
             seq_dict[transcript_id] = seqS
-            sys.stdout.write(".")
-            sys.stdout.flush()
-    sys.stdout.write("\n")
-    sys.stdout.flush()
+            #sys.stdout.write(".")
+            #sys.stdout.flush()
+    #sys.stdout.write("\n")
+    #sys.stdout.flush()
 
     for key in seq_dict.keys():
         seq_len[key] = len(seq_dict[key])
@@ -442,15 +441,15 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
     ecdf_dict_ref_exp = make_cdf(dict_exp, seq_len)
 
     # Start simulation
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of random reads\n")
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of reads\n")
     sys.stdout.flush()
     out_reads = open(out + "_reads.fasta", 'w')
     out_error = open(out + "_error_profile", 'w')
     out_error.write("Seq_name\tSeq_pos\terror_type\terror_length\tref_base\tseq_base\n")
 
     # Simulate unaligned reads
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of unaligned reads\n")
-    sys.stdout.flush()
+    #sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of unaligned reads\n")
+    #sys.stdout.flush()
     num_unaligned_length = len(unaligned_length)
     for i in xrange(num_unaligned_length):
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Number of reads simulated >> " + str(i) + "\r")
@@ -478,8 +477,8 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
     del unaligned_length
 
     # Simulate aligned reads
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of aligned reads\n")
-    sys.stdout.flush()
+    #sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of aligned reads\n")
+    #sys.stdout.flush()
 
     if per:
         read_total_len = get_length(aligned_dict, number_aligned, max_l, min_l)
@@ -849,55 +848,42 @@ def main():
     min_readlength = 50
     kmer_bias = 0
 
-    # Parse options and parameters
-    if len(sys.argv) < 3:
-        print ("error is here 111")
-        usage()
-        sys.exit(1)
-    else:
-        try:
-            opts, args = getopt.getopt(sys.argv[1:], "hr:e:c:o:n:i:d:m:",
-                                       ["max_len=", "min_len=", "perfect", "KmerBias="])
-        except getopt.GetoptError:
-            print ("error is here 222")
+
+    opts, args = getopt.getopt(sys.argv[1:], "hr:e:c:o:n:i:d:m:", ["max_len=", "min_len=", "perfect", "KmerBias="])
+
+    for opt, arg in opts:
+        print (opt, arg)
+        if opt == "-r":
+            ref = arg
+        elif opt == "-e":
+            exp = arg
+        elif opt == "-c":
+            model_prefix = arg
+        elif opt == "-o":
+            out = arg
+        elif opt == "-n":
+            number = int(arg)
+        elif opt == "-i":
+            ins_rate = float(arg)
+        elif opt == "-d":
+            del_rate = float(arg)
+        elif opt == "-m":
+            mis_rate = float(arg)
+        elif opt == "--max_len":
+            max_readlength = int(arg)
+        elif opt == "--min_len":
+            min_readlength = int(arg)
+        elif opt == "--perfect":
+            perfect = True
+        elif opt == "--KmerBias":
+            kmer_bias = int(arg)
+        elif opt == "-h":
             usage()
-            sys.exit(1)
-        for opt, arg in opts:
-            print (opt, arg)
-            if opt == "-r":
-                ref = arg
-            elif opt == "-e":
-                exp = arg
-            elif opt == "-c":
-                model_prefix = arg
-            elif opt == "-o":
-                out = arg
-            elif opt == "-n":
-                number = int(arg)
-            elif opt == "-i":
-                ins_rate = float(arg)
-            elif opt == "-d":
-                del_rate = float(arg)
-            elif opt == "-m":
-                mis_rate = float(arg)
-            elif opt == "--max_len":
-                max_readlength = int(arg)
-            elif opt == "--min_len":
-                min_readlength = int(arg)
-            elif opt == "--perfect":
-                perfect = True
-            elif opt == "--KmerBias":
-                kmer_bias = int(arg)
-            elif opt == "-h":
-                usage()
-                sys.exit(0)
-            else:
-                print ("error in here !!!")
-                usage()
-                sys.exit(1)
+            sys.exit(0)
 
     # Generate log file
-    sys.stdout = open(out + ".log", 'w')
+    #sys.stdout = open(out + ".log", 'w')
+
     # Record the command typed to log file
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ': ' + ' '.join(sys.argv) + '\n')
     sys.stdout.flush()
@@ -906,11 +892,6 @@ def main():
         print("must provide a reference transcriptome!")
         usage()
         sys.exit(1)
-
-    #if exp == "":
-        #print("must provide an expression profile for this reference transcriptome")
-        #usage()
-        #sys.exit(1)
 
     if max_readlength < min_readlength:
         print("maximum read length must be longer than minimum read length!")
@@ -921,7 +902,8 @@ def main():
 
     simulation(ref, out, perfect, kmer_bias, max_readlength, min_readlength, exp)
 
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!")
+    call("find . -name \*.pyc -delete", shell=True)
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
     sys.stdout.close()
 
 
