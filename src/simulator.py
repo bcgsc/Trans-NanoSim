@@ -10,6 +10,7 @@ This script generates simulated Oxford Nanopore 2D transcriptome reads.
 
 from __future__ import print_function
 from __future__ import with_statement
+from subprocess import call
 import sys
 import glob
 import getopt
@@ -904,7 +905,7 @@ def main():
 
     call("find . -name \*.pyc -delete", shell=True)
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
-    sys.stdout.close()
+    #sys.stdout.close()
 
 
 if __name__ == "__main__":
