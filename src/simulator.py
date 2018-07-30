@@ -14,6 +14,7 @@ from subprocess import call
 import sys
 import glob
 import getopt
+import argparse
 import random
 import numpy
 import time
@@ -849,7 +850,64 @@ def main():
     min_readlength = 50
     kmer_bias = 0
 
+    parser = argparse.ArgumentParser(
+        description='Given the read profiles from characterization step, ' \
+                    'simulate transcriptome ONT reads and output error profiles',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
 
+    parser.add_argument('-r', '--read', help='Input reads to quanity expression profiles')
+    parser.add_argument('-f', '--ref', help='Input reference transcriptome', required=True)
+    parser.add_argument('-e', '--expression', help='Expression profile in the specified format provided with documentation')
+    parser.add_argument('-c', '--model_prefix', help='Address for profiles created in characterization step (model_prefix)', required=True)
+    parser.add_argument('-o', '--output', help='Output address for simulated reads', required=True)
+    parser.add_argument('-n', '--number', help='Number of reads to be simulated', default = 20000)
+    parser.add_argument('-i', '--inseration_rate', help='Insertion rate (optional)')
+    parser.add_argument('-d', '--deletion_rate', help='Deletion rate (optional)')
+    parser.add_argument('-m', '--mismatch_rate', help='Mismatch rate (optional)')
+    parser.add_argument('-max', '--max_len', help='Transcriptome alignment file in sam or maf format (optional)')
+    parser.add_argument('-min', '--min_len', help='The output name and location for profiles', default = "training")
+    parser.add_argument('--perfect', help='Ignore profiles and simulated perfect reads', action='store_true')
+    parser.add_argument('--quantify', help='Quantify expression profile of input reads', action='store_true')
+    parser.add_argument('-k', '--KmerBias', help='Determine whether to considert Kmer Bias or not', action='store_true')
+    parser.add_argument('-h', '--help', help='Print the help menu')
+
+    args = parser.parse_args()
+
+    if args.read:
+        reads = args.read
+    ref = args.ref
+    if args.expression:
+        exp = args.expression
+    else:
+        #I should determine expression using the input reads / reference trx
+        pass
+
+    model_prefix = args.model_prefix
+    out = args.output
+    number = int(args.number)
+    if args.insertion_rate:
+        ins_rate = float(args.insertion_rate)
+    if args.deletion_rate:
+        del_rate = float(args.deletion_rate)
+    if args.mismatch_rate:
+        mis_rate = float(args.mismatch_rate)
+    if args.max_len:
+        max_readlength = int(args.max_len)
+    if args.min_len:
+        min_readlength = int(args.min_len)
+    if args.perfect:
+        perfect = True
+    if args.KmerBias:
+        kmer_bias = int(args.KmerBias)
+    if args.quantify:
+        quantify = True
+        # Only run quantification code and then exit.
+    if args.help:
+        usage()
+        sys.exit(0)
+
+    '''
     opts, args = getopt.getopt(sys.argv[1:], "hr:e:c:o:n:i:d:m:", ["max_len=", "min_len=", "perfect", "KmerBias="])
 
     for opt, arg in opts:
@@ -881,12 +939,14 @@ def main():
         elif opt == "-h":
             usage()
             sys.exit(0)
+    '''
 
     # Generate log file
-    #sys.stdout = open(out + ".log", 'w')
+    sys.stdout.log = open(out + ".log", 'w')
 
     # Record the command typed to log file
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ': ' + ' '.join(sys.argv) + '\n')
+    sys.stdout.log.write(strftime("%Y-%m-%d %H:%M:%S") + ': ' + ' '.join(sys.argv) + '\n')
     sys.stdout.flush()
 
     if ref == "":
@@ -905,7 +965,8 @@ def main():
 
     call("find . -name \*.pyc -delete", shell=True)
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
-    #sys.stdout.close()
+    sys.stdout.log.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
+    sys.stdout.log.close()
 
 
 if __name__ == "__main__":
