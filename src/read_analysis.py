@@ -57,8 +57,6 @@ def main():
     ref_g = ''
     ref_t = ''
     annot = ''
-    g_alnm = ''
-    t_alnm = ''
     model_fit = True
 
     parser = argparse.ArgumentParser(
@@ -71,8 +69,8 @@ def main():
     parser.add_argument('-rt', '--ref_t', help='Reference Transcriptome.', required=True)
     parser.add_argument('-annot', '--annot', help='Annotation file in ensemble GTF/GFF formats.', required=True)
     parser.add_argument('-a', '--aligner', help='The aligner to be used minimap2 or LAST (Default = minimap2)', default = 'minimap2')
-    parser.add_argument('-ga', '--g_alnm', help='Genome alignment file in sam or maf format (optional)')
-    parser.add_argument('-ta', '--t_alnm', help='Transcriptome alignment file in sam or maf format (optional)')
+    parser.add_argument('-ga', '--g_alnm', help='Genome alignment file in sam or maf format (optional)', default= '')
+    parser.add_argument('-ta', '--t_alnm', help='Transcriptome alignment file in sam or maf format (optional)', default= '')
     parser.add_argument('-o', '--output', help='The output name and location for profiles', default = "training")
     parser.add_argument('--no_model_fit', help='Disable model fitting step', action='store_true')
     parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)', default = 20)

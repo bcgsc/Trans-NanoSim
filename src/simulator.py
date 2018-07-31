@@ -22,6 +22,7 @@ from time import sleep
 import operator
 import re
 from time import strftime
+import mixed_model as mm
 
 try:
     from six.moves import xrange
@@ -32,7 +33,7 @@ try:
 except ImportError:
     sys.exit("""You need numpy!
                 install it from http://www.numpy.org/""")
-import mixed_model as mm
+
 
 PYTHON_VERSION = sys.version_info
 VERSION = "1.0.0"
@@ -836,19 +837,6 @@ def case_convert(seq):
 
 
 def main():
-    ref = ""
-    exp = ""
-    model_prefix = "training"
-    out = "simulated"
-    number = 20000
-    perfect = False
-    # ins, del, mis rate represent the weight tuning in mix model
-    ins_rate = 1
-    del_rate = 1
-    mis_rate = 1
-    max_readlength = float("inf")
-    min_readlength = 50
-    kmer_bias = 0
 
     parser = argparse.ArgumentParser(
         description='Given the read profiles from characterization step, ' \
@@ -856,36 +844,47 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
-    parser.add_argument('-r', '--read', help='Input reads to quanity expression profiles')
-    parser.add_argument('-f', '--ref', help='Input reference transcriptome', required=True)
-    parser.add_argument('-e', '--expression', help='Expression profile in the specified format provided with documentation')
-    parser.add_argument('-c', '--model_prefix', help='Address for profiles created in characterization step (model_prefix)', required=True)
-    parser.add_argument('-o', '--output', help='Output address for simulated reads', required=True)
-    parser.add_argument('-n', '--number', help='Number of reads to be simulated', default = 20000)
-    parser.add_argument('-i', '--inseration_rate', help='Insertion rate (optional)')
-    parser.add_argument('-d', '--deletion_rate', help='Deletion rate (optional)')
-    parser.add_argument('-m', '--mismatch_rate', help='Mismatch rate (optional)')
-    parser.add_argument('-max', '--max_len', help='Transcriptome alignment file in sam or maf format (optional)')
-    parser.add_argument('-min', '--min_len', help='The output name and location for profiles', default = "training")
+    reads = ''
+    exp = ''
+    model_prefix = ''
+    out = ''
+    number = ''
+    max_readlength = ''
+    min_readlength = ''
+    kmer_bias = ''
+    perfect = False
+    quantify = False
+
+    parser.add_argument('-r', '--read', help='Input reads to quanity expression profiles', type = str)
+    parser.add_argument('-f', '--ref', help='Input reference transcriptome', type = str, required= True)
+    parser.add_argument('-e', '--expression', help='Expression profile in the specified format provided with documentation', type = str)
+    parser.add_argument('-c', '--model_prefix', help='Address for profiles created in characterization step (model_prefix)', type = str, default= "training")
+    parser.add_argument('-o', '--output', help='Output address for simulated reads', type = str, default= "simulated")
+    parser.add_argument('-n', '--number', help='Number of reads to be simulated', type = int, default = 20000)
+    parser.add_argument('-i', '--insertion_rate', help='Insertion rate (optional)', type = float, default= 1)
+    parser.add_argument('-d', '--deletion_rate', help='Deletion rate (optional)', type = float, default= 1)
+    parser.add_argument('-m', '--mismatch_rate', help='Mismatch rate (optional)', type = float, default= 1)
+    parser.add_argument('-max', '--max_len', help='The maximum length for simulated reads', type=int, default= float("inf"))
+    parser.add_argument('-min', '--min_len', help='The minimum length for simulated reads', type=int, default= 50)
+    parser.add_argument('-k', '--KmerBias', help='Determine whether to considert Kmer Bias or not', type = int, default= 0)
+    parser.add_argument('-t', '--threads', help='Determine number of threads to use for abundance quantification', type = int, default= 1)
     parser.add_argument('--perfect', help='Ignore profiles and simulated perfect reads', action='store_true')
     parser.add_argument('--quantify', help='Quantify expression profile of input reads', action='store_true')
-    parser.add_argument('-k', '--KmerBias', help='Determine whether to considert Kmer Bias or not', action='store_true')
-    parser.add_argument('-h', '--help', help='Print the help menu')
 
     args = parser.parse_args()
 
+    ref = args.ref
+    model_prefix = args.model_prefix
+    out = args.output
+    number = args.number
+
     if args.read:
         reads = args.read
-    ref = args.ref
     if args.expression:
         exp = args.expression
     else:
-        #I should determine expression using the input reads / reference trx
+        # I should determine expression using the input reads / reference trx
         pass
-
-    model_prefix = args.model_prefix
-    out = args.output
-    number = int(args.number)
     if args.insertion_rate:
         ins_rate = float(args.insertion_rate)
     if args.deletion_rate:
@@ -893,19 +892,49 @@ def main():
     if args.mismatch_rate:
         mis_rate = float(args.mismatch_rate)
     if args.max_len:
-        max_readlength = int(args.max_len)
+        max_readlength = args.max_len
     if args.min_len:
-        min_readlength = int(args.min_len)
+        min_readlength = args.min_len
+    if args.threads:
+        num_threads = args.threads
     if args.perfect:
         perfect = True
     if args.KmerBias:
-        kmer_bias = int(args.KmerBias)
+        kmer_bias = args.KmerBias
     if args.quantify:
         quantify = True
-        # Only run quantification code and then exit.
-    if args.help:
-        usage()
-        sys.exit(0)
+
+
+    if quantify == True:
+        if ref == "" or reads == "":
+            sys.stdout.write('Please provide a set of reads (-r) and also a reference transcriptome (-f)\n')
+            usage()
+            sys.exit(0)
+        else:
+            sys.stdout.write('Quantifying transcript abundance: \n')
+            call("minimap2 -t " + str(num_threads) + " -x map-ont -p0 " + ref + " " + reads + " > " + "mapping.paf", shell=True)
+            call("python nanopore_transcript_abundance.py -i " + "mapping.paf > abundance.tsv", shell=True)
+            #call("find . -name \mapping.paf -delete", shell=True)
+            sys.exit(1)
+
+
+    print ("Running the simulation step with following arguments: \n")
+    print ("reads: ", reads)
+    print ("ref: ", ref)
+    print ("expression: ", exp)
+    print ("model_prefix: ", model_prefix)
+    print ("output: ", out)
+    print ("number: ", number)
+    print ("insertion_rate: ", ins_rate)
+    print ("deletion: ", del_rate)
+    print ("mismatch_rate: ", mis_rate)
+    print ("max_readlength: ", max_readlength)
+    print ("min_readlength: ", min_readlength)
+    print ("num_threads: ", num_threads)
+    print("kmer_bias: ", kmer_bias)
+    print ("perfect: ", perfect)
+    print ("quantify: ", quantify)
+
 
     '''
     opts, args = getopt.getopt(sys.argv[1:], "hr:e:c:o:n:i:d:m:", ["max_len=", "min_len=", "perfect", "KmerBias="])
@@ -939,7 +968,7 @@ def main():
         elif opt == "-h":
             usage()
             sys.exit(0)
-    '''
+    
 
     # Generate log file
     sys.stdout.log = open(out + ".log", 'w')
@@ -967,7 +996,7 @@ def main():
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
     sys.stdout.log.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
     sys.stdout.log.close()
-
+    '''
 
 if __name__ == "__main__":
     main()
