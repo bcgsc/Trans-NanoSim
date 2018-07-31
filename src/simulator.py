@@ -914,7 +914,6 @@ def main():
             sys.stdout.write('Quantifying transcript abundance: \n')
             call("minimap2 -t " + str(num_threads) + " -x map-ont -p0 " + ref + " " + reads + " > " + "mapping.paf", shell=True)
             call("python nanopore_transcript_abundance.py -i " + "mapping.paf > abundance.tsv", shell=True)
-            #call("find . -name \mapping.paf -delete", shell=True)
             sys.exit(1)
 
 
