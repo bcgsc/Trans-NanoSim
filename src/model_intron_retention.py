@@ -76,12 +76,8 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
     #count the length of Intron retention events
     list_IR = []
     list_not_IR = []
-    cl = 0
     dict_ir_len = {}
     for qname in dict_g_alnm:
-        cl += 1
-        if cl % 10000 == 0:
-            print(cl)
         galnm = dict_g_alnm[qname]
         if qname in dict_t_alnm:
             primary_trx = dict_t_alnm[qname].iv.chrom.split(".")[0]
@@ -93,7 +89,7 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
             length_IR_total = 0
             length_IR_full = 0
             length_IR_intron = 0
-            lengh_IR_read = []
+            length_IR_read = []
             try:
                 fs = set()
                 fs2_temp = set()
@@ -105,7 +101,7 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
                             fs2_temp = fs2.intersection(set([primary_trx]))
                         else:
                             if length_IR_intron != 0:
-                                lengh_IR_read.append(length_IR_intron)
+                                length_IR_read.append(length_IR_intron)
                                 for intron in dict_intron_info[primary_trx]:
                                     if length_IR_intron == intron[2]:
                                         length_IR_full += length_IR_intron
