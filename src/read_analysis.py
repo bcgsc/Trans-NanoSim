@@ -58,6 +58,7 @@ def main():
     ref_t = ''
     annot = ''
     model_fit = True
+    quantify = False
 
     parser = argparse.ArgumentParser(
         description='Given the read profiles from characterization step, ' \
@@ -75,6 +76,7 @@ def main():
     parser.add_argument('--no_model_fit', help='Disable model fitting step', action='store_true')
     parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)', default = 20)
     parser.add_argument('-t', '--num_threads', help='Number of threads to be used in alignments and model fitting (Default = 1)', default=1)
+    parser.add_argument('--quantify', help='Quantify expression profile of input reads', action='store_true')
 
     args = parser.parse_args()
 
@@ -96,6 +98,8 @@ def main():
         num_bins = max(args.num_bins, 1)
     if args.num_threads:
         num_threads = max(args.num_threads, 1)
+    if args.quantify:
+        quantify = True
 
     print ("Running the characterization step with following arguments: \n")
     print ("infile", infile)
@@ -109,6 +113,17 @@ def main():
     print ("model_fit", model_fit)
     print ("num_bins", num_bins)
     print ("num_threads", num_threads)
+    print ("Quantify" , quantify)
+
+    #Quantifying the transcript abundance from input read
+    sys.stdout.write('Quantifying transcripts abundance: \n')
+    sys.stdout.log.write('Quantifying transcripts abundance: \n')
+    call("minimap2 -t " + str(num_threads) + " -x map-ont -p0 " + ref_t + " " + infile + " > " + "mapping.paf", shell=True)
+    call("python nanopore_transcript_abundance.py -i " + "mapping.paf > abundance.tsv", shell=True)
+    sys.stdout.write('Finished! \n')
+    sys.stdout.log.write('Finished! \n')
+    if quantify == True:
+        sys.exit(1)
 
 
     if (g_alnm != '' and t_alnm == '') or (g_alnm == '' and t_alnm != ''):

@@ -853,7 +853,6 @@ def main():
     min_readlength = ''
     kmer_bias = ''
     perfect = False
-    quantify = False
 
     parser.add_argument('-r', '--read', help='Input reads to quanity expression profiles', type = str)
     parser.add_argument('-f', '--ref', help='Input reference transcriptome', type = str, required= True)
@@ -867,9 +866,7 @@ def main():
     parser.add_argument('-max', '--max_len', help='The maximum length for simulated reads', type=int, default= float("inf"))
     parser.add_argument('-min', '--min_len', help='The minimum length for simulated reads', type=int, default= 50)
     parser.add_argument('-k', '--KmerBias', help='Determine whether to considert Kmer Bias or not', type = int, default= 0)
-    parser.add_argument('-t', '--threads', help='Determine number of threads to use for abundance quantification', type = int, default= 1)
     parser.add_argument('--perfect', help='Ignore profiles and simulated perfect reads', action='store_true')
-    parser.add_argument('--quantify', help='Quantify expression profile of input reads', action='store_true')
 
     args = parser.parse_args()
 
@@ -883,8 +880,8 @@ def main():
     if args.expression:
         exp = args.expression
     else:
-        # I should determine expression using the input reads / reference trx
-        pass
+        sys.stdout.write('The expression profile of the simulated reads will be determined by input reads used in characterization step. \n')
+        exp = model_prefix
     if args.insertion_rate:
         ins_rate = float(args.insertion_rate)
     if args.deletion_rate:
@@ -895,26 +892,10 @@ def main():
         max_readlength = args.max_len
     if args.min_len:
         min_readlength = args.min_len
-    if args.threads:
-        num_threads = args.threads
     if args.perfect:
         perfect = True
     if args.KmerBias:
         kmer_bias = args.KmerBias
-    if args.quantify:
-        quantify = True
-
-
-    if quantify == True:
-        if ref == "" or reads == "":
-            sys.stdout.write('Please provide a set of reads (-r) and also a reference transcriptome (-f)\n')
-            usage()
-            sys.exit(0)
-        else:
-            sys.stdout.write('Quantifying transcript abundance: \n')
-            call("minimap2 -t " + str(num_threads) + " -x map-ont -p0 " + ref + " " + reads + " > " + "mapping.paf", shell=True)
-            call("python nanopore_transcript_abundance.py -i " + "mapping.paf > abundance.tsv", shell=True)
-            sys.exit(1)
 
 
     print ("Running the simulation step with following arguments: \n")
@@ -929,45 +910,9 @@ def main():
     print ("mismatch_rate: ", mis_rate)
     print ("max_readlength: ", max_readlength)
     print ("min_readlength: ", min_readlength)
-    print ("num_threads: ", num_threads)
     print("kmer_bias: ", kmer_bias)
     print ("perfect: ", perfect)
-    print ("quantify: ", quantify)
 
-
-    '''
-    opts, args = getopt.getopt(sys.argv[1:], "hr:e:c:o:n:i:d:m:", ["max_len=", "min_len=", "perfect", "KmerBias="])
-
-    for opt, arg in opts:
-        print (opt, arg)
-        if opt == "-r":
-            ref = arg
-        elif opt == "-e":
-            exp = arg
-        elif opt == "-c":
-            model_prefix = arg
-        elif opt == "-o":
-            out = arg
-        elif opt == "-n":
-            number = int(arg)
-        elif opt == "-i":
-            ins_rate = float(arg)
-        elif opt == "-d":
-            del_rate = float(arg)
-        elif opt == "-m":
-            mis_rate = float(arg)
-        elif opt == "--max_len":
-            max_readlength = int(arg)
-        elif opt == "--min_len":
-            min_readlength = int(arg)
-        elif opt == "--perfect":
-            perfect = True
-        elif opt == "--KmerBias":
-            kmer_bias = int(arg)
-        elif opt == "-h":
-            usage()
-            sys.exit(0)
-    
 
     # Generate log file
     sys.stdout.log = open(out + ".log", 'w')
@@ -976,11 +921,6 @@ def main():
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ': ' + ' '.join(sys.argv) + '\n')
     sys.stdout.log.write(strftime("%Y-%m-%d %H:%M:%S") + ': ' + ' '.join(sys.argv) + '\n')
     sys.stdout.flush()
-
-    if ref == "":
-        print("must provide a reference transcriptome!")
-        usage()
-        sys.exit(1)
 
     if max_readlength < min_readlength:
         print("maximum read length must be longer than minimum read length!")
@@ -995,7 +935,7 @@ def main():
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
     sys.stdout.log.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
     sys.stdout.log.close()
-    '''
+
 
 if __name__ == "__main__":
     main()
