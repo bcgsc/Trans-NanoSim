@@ -76,9 +76,6 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
 
     #count the length of Intron retention events
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Calculating probabilites for each intron retention event\n")
-    list_IR = []
-    list_not_IR = []
-    dict_ir_len = {}
     dict_states = {(False, False): 0, (False, True): 0, (True, False): 0, (True, True): 0}
     for qname in dict_g_alnm:
         galnm = dict_g_alnm[qname]
@@ -110,6 +107,7 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
                                     if length_IR == intron[2]:
                                         ir_info = True
                                 length_IR = 0
+                                pos = []
             except UnknownChrom:
                 ir_info = False
                 pass
@@ -121,58 +119,37 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
                     for i in range(1, len(dict_intron_info[primary_trx])):
                         dict_states[(False, False)] += 1
             else:
-                list_IR_positions = []
-                pos = []
-                length_IR = 0
-                for co in galnm.cigar:
-                    if co.type in ["D", "M"] and co.size > 0:
-                        if co.ref_iv.chrom not in features.chrom_vectors:
-                            raise UnknownChrom
-                        for iv2, fs2 in features[co.ref_iv].steps():
-                            # print (co.type, co.size, co.ref_iv, iv2, fs2.intersection(set(list_IR_info)))
-                            if fs2.intersection(set(list_IR_info)):
-                                length_IR += iv2.length
-                                pos.append(iv2.start)
-                                pos.append(iv2.end)
-                            else:
-                                if length_IR != 0:
-                                    list_IR_positions.append(min(pos))
-                                    list_IR_positions.append(max(pos))
-                                length_IR = 0
-                                pos = []
-
-            # Now, go over all introns and check with the IR events
-            # First we need to determine the state of first intron:
-            first_intron = dict_intron_info[primary_trx][0]
-            first_intron_spos = first_intron[0]
-            first_intron_epos = first_intron[1]
-            flag = False
-            for IR_pos in list_IR_positions:
-                if first_intron_spos <= IR_pos <= first_intron_epos:
-                    flag = True
-                    break
-            if flag == True:
-                dict_first_intron_state[True] += 1
-                previous_state = True
-            else:
-                dict_first_intron_state[False] += 1
-                previous_state = False
-
-            # Then we will go over other introns:
-            current_state = False
-            for i in range (1, len(dict_intron_info[primary_trx])):
-                intron = dict_intron_info[primary_trx][i]
-                current_state = False
-                intron_spos = intron[0]
-                intron_epos = intron[1]
+                # Now, go over all introns and check with the IR events
+                # First we need to determine the state of first intron:
+                first_intron = dict_intron_info[primary_trx][0]
+                first_intron_spos = first_intron[0]
+                first_intron_epos = first_intron[1]
+                flag = False
                 for IR_pos in list_IR_positions:
-                    if intron_spos <= IR_pos <= intron_epos:
-                        current_state = True
+                    if first_intron_spos <= IR_pos <= first_intron_epos:
+                        flag = True
                         break
-                #print(intron_spos, intron_epos, previous_state, current_state)
-                dict_states[(previous_state, current_state)] += 1
-                previous_state = current_state
+                if flag == True:
+                    dict_first_intron_state[True] += 1
+                    previous_state = True
+                else:
+                    dict_first_intron_state[False] += 1
+                    previous_state = False
 
-            dict_ir_len[qname] = [length_IR_total, length_IR_full]
+                # Then we will go over other introns:
+                current_state = False
+                for i in range (1, len(dict_intron_info[primary_trx])):
+                    intron = dict_intron_info[primary_trx][i]
+                    current_state = False
+                    intron_spos = intron[0]
+                    intron_epos = intron[1]
+                    for IR_pos in list_IR_positions:
+                        if intron_spos <= IR_pos <= intron_epos:
+                            current_state = True
+                            break
+                    #print(intron_spos, intron_epos, previous_state, current_state)
+                    dict_states[(previous_state, current_state)] += 1
+                    previous_state = current_state
 
-    return dict_ir_len, dict_states
+
+    return dict_states
