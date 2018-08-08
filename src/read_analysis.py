@@ -58,6 +58,7 @@ def main():
     ref_t = ''
     annot = ''
     model_fit = True
+    intron_retention = True
     quantify = False
 
     parser = argparse.ArgumentParser(
@@ -74,6 +75,7 @@ def main():
     parser.add_argument('-ta', '--t_alnm', help='Transcriptome alignment file in sam or maf format (optional)', default= '')
     parser.add_argument('-o', '--output', help='The output name and location for profiles', default = "training")
     parser.add_argument('--no_model_fit', help='Disable model fitting step', action='store_true')
+    parser.add_argument('--no_intron_retention', help='Disable Intron Retention analysis', action='store_true')
     parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)', default = 20)
     parser.add_argument('-t', '--num_threads', help='Number of threads to be used in alignments and model fitting (Default = 1)', default=1)
     parser.add_argument('--quantify', help='Quantify expression profile of input reads', action='store_true')
@@ -94,6 +96,8 @@ def main():
         outfile = args.output
     if args.no_model_fit:
         model_fit = False
+    if args.no_intron_retention:
+        intron_retention = False
     if args.num_bins:
         num_bins = max(args.num_bins, 1)
     if args.num_threads:
@@ -118,10 +122,11 @@ def main():
     #Quantifying the transcript abundance from input read
     sys.stdout.write('Quantifying transcripts abundance: \n')
     sys.stdout.log.write('Quantifying transcripts abundance: \n')
-    call("minimap2 -t " + str(num_threads) + " -x map-ont -p0 " + ref_t + " " + infile + " > " + "mapping.paf", shell=True)
-    call("python nanopore_transcript_abundance.py -i " + "mapping.paf > abundance.tsv", shell=True)
+    call("minimap2 -t " + str(num_threads) + " -x map-ont -p0 " + ref_t + " " + infile + " > " + outfile + "_mapping.paf", shell=True)
+    call("python nanopore_transcript_abundance.py -i " + outfile + "_mapping.paf > " + outfile + "_abundance.tsv", shell=True)
     sys.stdout.write('Finished! \n')
     sys.stdout.log.write('Finished! \n')
+
     if quantify == True:
         sys.exit(1)
 
@@ -202,14 +207,6 @@ def main():
 
     #If both alignment files are provided:
     if g_alnm != "" and t_alnm != "":
-        # g_alnm_filename, g_alnm_ext = os.path.splitext(g_alnm)
-        # t_alnm_filename, t_alnm_ext = os.path.splitext(t_alnm)
-        # g_alnm_ext = g_alnm_ext [1:]
-        # t_alnm_ext = t_alnm_ext[1:]
-        # if g_alnm_ext != t_alnm_ext:
-        #     print("Please provide both alignments in a same format: sam OR maf\n")
-        #     usage()
-        #     sys.exit(1)
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Processing the alignment files: " + t_alnm_ext + "\n")
         if t_alnm_ext == "maf":
             outmaf_g = outfile + "_genome_alnm.maf"
@@ -291,6 +288,10 @@ def main():
     # MATCH AND ERROR MODELS
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": match and error models\n")
     error_model.hist(outfile, t_alnm_ext)
+
+    if intron_retention:
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Modeling Intron Retentio\n")
+        model_ir.intron_retention(gff_file, talnm_file, galnm_file, ref_t)
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")
