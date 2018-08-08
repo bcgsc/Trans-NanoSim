@@ -16,11 +16,9 @@ def invert_strand(iv):
 
 def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
     gff_features = HTSeq.GFF_Reader(gff_file, end_included=True)
-    #t_alnm = "/projects/btl/shafez/analysis/testing_alignment_tools/minimap2/SRR5286960_trx_alm.sam"
-    #g_alnm = "/projects/btl/shafez/analysis/testing_alignment_tools/minimap2/SRR5286960_genome_alm.sam"
-    #ref_t = "/projects/btl_scratch/datasets/ref_transcriptome/mus_musculus/Mus_musculus.GRCm38.cdna.all.fa"
 
     #read the reference transcriptome to get their length.
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading reference transcript lengths\n")
     dict_ref_len = {}
     with open(ref_t) as f:
         for line in f:
@@ -32,6 +30,7 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
 
 
     #read intron information from GFF file
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading intron coordinates from GFF file\n")
     features = HTSeq.GenomicArrayOfSets("auto", stranded=False)
     c = 0
     dict_intron_info = {}
@@ -50,7 +49,8 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
             features[feature.iv] += feature_id
             dict_intron_info[feature_id].append((feature.iv.start, feature.iv.end, feature.iv.length))
 
-
+    #read primary genome alignment for each read
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read primary genome alignment for each read\n")
     dict_g_alnm = {}
     sam_reader = HTSeq.SAM_Reader
     g_alignments = sam_reader(galnm_file)
@@ -61,7 +61,8 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
         if alnm.supplementary and qname in dict_g_alnm:
             del dict_g_alnm[qname]  # delete chimeric reads
 
-
+    #read primary transcriptome alignment for each read
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read primary transcriptome alignment for each read\n")
     dict_t_alnm = {}
     sam_reader = HTSeq.SAM_Reader
     t_alignments = sam_reader(talnm_file)
@@ -74,47 +75,104 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
 
 
     #count the length of Intron retention events
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Calculating probabilites for each intron retention event\n")
     list_IR = []
     list_not_IR = []
     dict_ir_len = {}
+    dict_states = {(False, False): 0, (False, True): 0, (True, False): 0, (True, True): 0}
     for qname in dict_g_alnm:
         galnm = dict_g_alnm[qname]
         if qname in dict_t_alnm:
-            primary_trx = dict_t_alnm[qname].iv.chrom.split(".")[0]
+            talnm = dict_t_alnm[qname]
+            primary_trx = talnm.iv.chrom.split(".")[0]
             if stranded != "reverse":
                 iv_seq = (co.ref_iv for co in galnm.cigar if (co.type in ('M', '=', 'X', 'D') and co.size > 0))
                 #iv_seq = (co.ref_iv for co in galnm.cigar if co.type in ('M', 'D') and co.size > 0) #tested. test the above cases too to make sure about it.
             else:
                 iv_seq = (invert_strand(co.ref_iv) for co in galnm.cigar if (co.type in ('M', '=', 'X', 'D') and co.size > 0))
-            length_IR_total = 0
-            length_IR_full = 0
-            length_IR_intron = 0
-            length_IR_read = []
+
+            list_IR_positions = []
+            pos = []
+            ir_info = False
             try:
-                fs = set()
-                fs2_temp = set()
+                length_IR = 0
                 for iv in iv_seq:
                     for iv2, fs2 in features[iv].steps():
                         if fs2.intersection(set([primary_trx])):
-                            length_IR_total += iv2.length
-                            length_IR_intron += iv2.length
-                            fs2_temp = fs2.intersection(set([primary_trx]))
+                            length_IR += iv2.length
+                            pos.append(iv2.start)
+                            pos.append(iv2.end)
                         else:
-                            if length_IR_intron != 0:
-                                length_IR_read.append(length_IR_intron)
+                            if length_IR != 0:
+                                list_IR_positions.append(min(pos))
+                                list_IR_positions.append(max(pos))
                                 for intron in dict_intron_info[primary_trx]:
-                                    if length_IR_intron == intron[2]:
-                                        length_IR_full += length_IR_intron
-                                        fs = fs.union(fs2_temp)
-                                length_IR_intron = 0
-                                fs2_temp = set()
-                if fs is None or len(fs) == 0:
-                    list_not_IR.append(qname)
-                elif len(fs) >= 1:
-                    list_IR.append(qname)
+                                    if length_IR == intron[2]:
+                                        ir_info = True
+                                length_IR = 0
             except UnknownChrom:
-                list_not_IR.append(qname)
+                ir_info = False
+                pass
+
+            if ir_info == False:
+                if primary_trx in dict_intron_info:
+                    if len(dict_intron_info[primary_trx]) >= 1: #if there is a intron
+                        dict_first_intron_state[False] += 1
+                    for i in range(1, len(dict_intron_info[primary_trx])):
+                        dict_states[(False, False)] += 1
+            else:
+                list_IR_positions = []
+                pos = []
+                length_IR = 0
+                for co in galnm.cigar:
+                    if co.type in ["D", "M"] and co.size > 0:
+                        if co.ref_iv.chrom not in features.chrom_vectors:
+                            raise UnknownChrom
+                        for iv2, fs2 in features[co.ref_iv].steps():
+                            # print (co.type, co.size, co.ref_iv, iv2, fs2.intersection(set(list_IR_info)))
+                            if fs2.intersection(set(list_IR_info)):
+                                length_IR += iv2.length
+                                pos.append(iv2.start)
+                                pos.append(iv2.end)
+                            else:
+                                if length_IR != 0:
+                                    list_IR_positions.append(min(pos))
+                                    list_IR_positions.append(max(pos))
+                                length_IR = 0
+                                pos = []
+
+            # Now, go over all introns and check with the IR events
+            # First we need to determine the state of first intron:
+            first_intron = dict_intron_info[primary_trx][0]
+            first_intron_spos = first_intron[0]
+            first_intron_epos = first_intron[1]
+            flag = False
+            for IR_pos in list_IR_positions:
+                if first_intron_spos <= IR_pos <= first_intron_epos:
+                    flag = True
+                    break
+            if flag == True:
+                dict_first_intron_state[True] += 1
+                previous_state = True
+            else:
+                dict_first_intron_state[False] += 1
+                previous_state = False
+
+            # Then we will go over other introns:
+            current_state = False
+            for i in range (1, len(dict_intron_info[primary_trx])):
+                intron = dict_intron_info[primary_trx][i]
+                current_state = False
+                intron_spos = intron[0]
+                intron_epos = intron[1]
+                for IR_pos in list_IR_positions:
+                    if intron_spos <= IR_pos <= intron_epos:
+                        current_state = True
+                        break
+                #print(intron_spos, intron_epos, previous_state, current_state)
+                dict_states[(previous_state, current_state)] += 1
+                previous_state = current_state
 
             dict_ir_len[qname] = [length_IR_total, length_IR_full]
 
-    return dict_ir_len
+    return dict_ir_len, dict_states
