@@ -290,8 +290,8 @@ def main():
     error_model.hist(outfile, t_alnm_ext)
 
     if intron_retention:
-        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Modeling Intron Retentio\n")
-        model_ir.intron_retention(gff_file, talnm_file, galnm_file, ref_t)
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Modeling Intron Retention\n")
+        model_ir.intron_retention(outfile, gff_file, talnm_file, galnm_file, ref_t)
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")

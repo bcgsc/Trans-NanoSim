@@ -14,7 +14,9 @@ def invert_strand(iv):
         raise ValueError("Illegal strand")
     return iv2
 
-def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
+def intron_retention(outfile, gff_file, talnm_file, galnm_file, ref_t):
+
+    outfile = open(outfile + "_intron_retention_probs", 'w')
     gff_features = HTSeq.GFF_Reader(gff_file, end_included=True)
 
     #read the reference transcriptome to get their length.
@@ -76,6 +78,7 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
 
     #count the length of Intron retention events
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Calculating probabilites for each intron retention event\n")
+    dict_first_intron_state = {False: 0, True: 0}
     dict_states = {(False, False): 0, (False, True): 0, (True, False): 0, (True, True): 0}
     for qname in dict_g_alnm:
         galnm = dict_g_alnm[qname]
@@ -151,5 +154,10 @@ def intron_retention(gff_file, talnm_file, galnm_file, ref_t):
                     dict_states[(previous_state, current_state)] += 1
                     previous_state = current_state
 
-
-    return dict_states
+    num_first_introns = dict_first_intron_state[True] + dict_first_intron_state[False]
+    outfile.write("first intron IR event probability: " + str(dict_first_intron_state[True] / float(num_first_introns)) + "\n")
+    outfile.write("previous_state\tcurrent_state\tprob\n")
+    outfile.write("False\tFalse\t" + str(dict_states[(False, False)]) + "\n")
+    outfile.write("False\tTrue\t" + str(dict_states[(False, True)]) + "\n")
+    outfile.write("True\tFalse\t" + str(dict_states[(True, False)]) + "\n")
+    outfile.write("True\tTrue\t" + str(dict_states[(True, True)]) + "\n")
