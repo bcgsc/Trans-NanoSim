@@ -25,17 +25,6 @@ def intron_retention(outfile, ref_t):
     talnm_file = glob.glob(outfile + "_transcriptome_alnm.sam")[0]
     galnm_file = glob.glob(outfile + "_genome_alnm.sam")[0]
 
-    #read the reference transcriptome to get their length.
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading reference transcript lengths\n")
-    dict_ref_len = {}
-    with open(ref_t) as f:
-        for line in f:
-            if line.startswith(">"):
-                ref_id = line.split()[0][1:]
-                dict_ref_len[ref_id] = 0
-            else:
-                dict_ref_len[ref_id] += len(line.strip())
-
 
     #read intron information from GFF file
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading intron coordinates from GFF file\n")
