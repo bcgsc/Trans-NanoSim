@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 
+
 from __future__ import with_statement
+import glob
+import sys
+from time import strftime
+import HTSeq
 
 stranded = "no" # think about it. Should I input this info for cDNA ONT data or not?
 
@@ -14,10 +19,11 @@ def invert_strand(iv):
         raise ValueError("Illegal strand")
     return iv2
 
-def intron_retention(outfile, gff_file, talnm_file, galnm_file, ref_t):
+def intron_retention(outfile, ref_t):
 
-    outfile = open(outfile + "_intron_retention_probs", 'w')
-    gff_features = HTSeq.GFF_Reader(gff_file, end_included=True)
+    gff_file = outfile + "_addedintron.gff3"
+    talnm_file = glob.glob(outfile + "_transcriptome_alnm.sam")[0]
+    galnm_file = glob.glob(outfile + "_genome_alnm.sam")[0]
 
     #read the reference transcriptome to get their length.
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading reference transcript lengths\n")
@@ -33,13 +39,10 @@ def intron_retention(outfile, gff_file, talnm_file, galnm_file, ref_t):
 
     #read intron information from GFF file
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading intron coordinates from GFF file\n")
+    gff_features = HTSeq.GFF_Reader(gff_file, end_included=True)
     features = HTSeq.GenomicArrayOfSets("auto", stranded=False)
-    c = 0
     dict_intron_info = {}
     for feature in gff_features:
-        c += 1
-        if c % 100000 == 0:
-            print(str(c) + " features proccessed!")
         if "Parent" in feature.attr:
             info = feature.attr["Parent"].split(':')
             if info[0] == "transcript":
@@ -154,10 +157,15 @@ def intron_retention(outfile, gff_file, talnm_file, galnm_file, ref_t):
                     dict_states[(previous_state, current_state)] += 1
                     previous_state = current_state
 
-    num_first_introns = dict_first_intron_state[True] + dict_first_intron_state[False]
-    outfile.write("first intron IR event probability: " + str(dict_first_intron_state[True] / float(num_first_introns)) + "\n")
-    outfile.write("previous_state\tcurrent_state\tprob\n")
-    outfile.write("False\tFalse\t" + str(dict_states[(False, False)]) + "\n")
-    outfile.write("False\tTrue\t" + str(dict_states[(False, True)]) + "\n")
-    outfile.write("True\tFalse\t" + str(dict_states[(True, False)]) + "\n")
-    outfile.write("True\tTrue\t" + str(dict_states[(True, True)]) + "\n")
+    sum_first_introns = dict_first_intron_state[True] + dict_first_intron_state[False]
+    sum_other_introns = sum(dict_states[key] for key in dict_states.keys())
+
+    fout = open(outfile + "_intron_retention_probs", 'w')
+    fout.write("first intron IR event probability: " + str(round(dict_first_intron_state[True] / float(sum_first_introns) * 100, 3)) + "\n")
+    fout.write("previous_state\tcurrent_state\tcount\tprob\n")
+    fout.write("False\tFalse\t" + str(dict_states[(False, False)]) + "\t" + str(round(dict_states[(False, False)] / float(sum_other_introns) * 100, 3)) + "\n")
+    fout.write("False\tTrue\t" + str(dict_states[(False, True)]) + "\t" + str(round(dict_states[(False, True)] / float(sum_other_introns) * 100, 3)) + "\n")
+    fout.write("True\tFalse\t" + str(dict_states[(True, False)]) + "\t" +str(round(dict_states[(True, False)] / float(sum_other_introns) * 100, 3)) + "\n")
+    fout.write("True\tTrue\t" + str(dict_states[(True, True)]) + "\t" + str(round(dict_states[(True, True)] / float(sum_other_introns) * 100, 3)) + "\n")
+    fout.close()
+    return dict_first_intron_state, dict_states

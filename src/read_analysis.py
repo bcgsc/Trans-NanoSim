@@ -30,6 +30,7 @@ import get_besthit_maf
 import get_primary_sam
 import besthit_to_histogram as error_model
 import model_fitting
+import model_intron_retention as model_ir
 
 
 # Usage information
@@ -59,6 +60,7 @@ def main():
     annot = ''
     model_fit = True
     intron_retention = True
+    detect_IR = False
     quantify = False
 
     parser = argparse.ArgumentParser(
@@ -76,32 +78,31 @@ def main():
     parser.add_argument('-o', '--output', help='The output name and location for profiles', default = "training")
     parser.add_argument('--no_model_fit', help='Disable model fitting step', action='store_true')
     parser.add_argument('--no_intron_retention', help='Disable Intron Retention analysis', action='store_true')
+    parser.add_argument('--detect_IR', help='Detect Intron Retention events using input reads and exit', action='store_true')
     parser.add_argument('-b', '--num_bins', help='Number of bins to be used (Default = 20)', default = 20)
     parser.add_argument('-t', '--num_threads', help='Number of threads to be used in alignments and model fitting (Default = 1)', default=1)
     parser.add_argument('--quantify', help='Quantify expression profile of input reads', action='store_true')
 
     args = parser.parse_args()
 
+
     infile = args.read
     ref_g = args.ref_g
     ref_t = args.ref_t
     annot = args.annot
-    if args.aligner:
-        aligner = args.aligner
-    if args.g_alnm:
-        g_alnm = args.g_alnm
-    if args.t_alnm:
-        t_alnm = args.t_alnm
-    if args.output:
-        outfile = args.output
+    aligner = args.aligner
+    g_alnm = args.g_alnm
+    t_alnm = args.t_alnm
+    outfile = args.output
+    num_bins = max(args.num_bins, 1)
+    num_threads = max(args.num_threads, 1)
+
     if args.no_model_fit:
         model_fit = False
     if args.no_intron_retention:
         intron_retention = False
-    if args.num_bins:
-        num_bins = max(args.num_bins, 1)
-    if args.num_threads:
-        num_threads = max(args.num_threads, 1)
+    if args.detect_IR:
+        detect_IR = True
     if args.quantify:
         quantify = True
 
@@ -111,26 +112,28 @@ def main():
     print ("ref_t", ref_t)
     print ("annot", annot)
     print ("aligner", aligner)
-    print ("alignment_genome", g_alnm)
-    print ("alignment_transcriptome", t_alnm)
+    print ("g_alnm", g_alnm)
+    print ("t_alnm", t_alnm)
     print ("outfile", outfile)
     print ("model_fit", model_fit)
     print ("num_bins", num_bins)
     print ("num_threads", num_threads)
-    print ("Quantify" , quantify)
+    print ("detect_IR", detect_IR)
+    print ("quantify" , quantify)
+
 
     #Quantifying the transcript abundance from input read
     sys.stdout.write('Quantifying transcripts abundance: \n')
-    sys.stdout.log.write('Quantifying transcripts abundance: \n')
+    #sys.stdout.log.write('Quantifying transcripts abundance: \n')
     call("minimap2 -t " + str(num_threads) + " -x map-ont -p0 " + ref_t + " " + infile + " > " + outfile + "_mapping.paf", shell=True)
     call("python nanopore_transcript_abundance.py -i " + outfile + "_mapping.paf > " + outfile + "_abundance.tsv", shell=True)
     sys.stdout.write('Finished! \n')
-    sys.stdout.log.write('Finished! \n')
+    #sys.stdout.log.write('Finished! \n')
 
     if quantify == True:
         sys.exit(1)
 
-
+    
     if (g_alnm != '' and t_alnm == '') or (g_alnm == '' and t_alnm != ''):
         print("Please specify either both alignment files (-ga and -ta) OR an aligner to use for alignment (-a)")
         usage()
@@ -178,21 +181,6 @@ def main():
     # Next, add intron info into gff3:
     call("gt gff3 -tidy -retainids -checkids -addintrons -o " + outfile + "_addedintron.gff3 " + annot_filename + ".gff3", shell=True)
 
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read the intron coordinates to dictionary\n")
-    features = HTSeq.GenomicArrayOfSets("auto", stranded=False)
-    dict_intron_info = {}
-    annot_gff3_withintron = outfile + "_addedintron.gff3"
-    gff_file = HTSeq.GFF_Reader(annot_gff3_withintron, end_included=True)
-    for feature in gff_file:
-        if "Parent" in feature.attr:
-            info = feature.attr["Parent"].split(':')
-            if info[0] == "transcript":
-                feature_id = info[1]
-                if feature_id not in dict_intron_info:
-                    dict_intron_info[feature_id] = []
-        if feature.type == "intron":
-            features[feature.iv] += feature_id
-            dict_intron_info[feature_id].append((feature.iv.start, feature.iv.end, feature.iv.length))
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read the length of reference transcripts \n")
     #Read the length of reference transcripts from the reference transcriptome
@@ -263,6 +251,11 @@ def main():
             print("Please specify an acceptable aligner (minimap2 or LAST)\n")
             usage()
             sys.exit(1)
+
+
+    if detect_IR == True:
+        dict_first_intron, dict_ir_states = model_ir.intron_retention(outfile, ref_t)
+        sys.exit(1)
 
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reads length distribution analysis\n")
