@@ -254,7 +254,9 @@ def main():
 
 
     if detect_IR == True:
-        dict_first_intron, dict_ir_states = model_ir.intron_retention(outfile, ref_t)
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Detecting Intron Retention events using input reads\n")
+        model_ir.intron_retention(outfile, ref_t)
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished\n")
         sys.exit(1)
 
 
@@ -284,7 +286,7 @@ def main():
 
     if intron_retention:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Modeling Intron Retention\n")
-        model_ir.intron_retention(outfile, gff_file, talnm_file, galnm_file, ref_t)
+        model_ir.intron_retention(outfile, ref_t)
 
     if model_fit:
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Model fitting\n")

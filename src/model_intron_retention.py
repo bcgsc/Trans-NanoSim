@@ -157,4 +157,3 @@ def intron_retention(outfile, ref_t):
     fout.write("True\tFalse\t" + str(dict_states[(True, False)]) + "\t" +str(round(dict_states[(True, False)] / float(sum_other_introns) * 100, 3)) + "\n")
     fout.write("True\tTrue\t" + str(dict_states[(True, True)]) + "\t" + str(round(dict_states[(True, True)] / float(sum_other_introns) * 100, 3)) + "\n")
     fout.close()
-    return dict_first_intron_state, dict_states
