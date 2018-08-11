@@ -256,6 +256,7 @@ def read_profile(number, model_prefix, per, max_l, min_l):
     global first_match_hist, align_ratio, ht_dict, error_model_profile
     global error_markov_model, match_markov_model
     global dict_head, dict_tail
+    global dict_ir_states
 
     # Read model profile for match, mismatch, insertion and deletions
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read error profile\n")
@@ -352,6 +353,16 @@ def read_profile(number, model_prefix, per, max_l, min_l):
             else:
                 dict_tail[len(tseq)].append(tseq)
 
+    dict_ir_states = {}
+    with open(model_prefix + "_intron_retention_probs", "r") as  ir_probs:
+        fline = ir_probs.readline()
+        f_intron_prob = float(fline.split("\t")[1])
+        dict_ir_states["first"] = f_intron_prob
+        sec_line = ir_probs.readline()
+        for line in ir_probs:
+            line_parts = line.split("\t")
+            dict_ir_states[(line_parts[0], line_parts[1])] = float(line_parts[-1])
+
 
 def get_ht_sequence(dict_ht, length):
     return random.choice(dict_ht[length])
@@ -407,6 +418,7 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
     global first_match_hist, align_ratio, ht_dict, match_markov_model
     global error_markov_model, error_model_profile
     global dict_head, dict_tail
+    global dict_ir_states
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read in reference transcriptome (length and expression)\n")
     sys.stdout.flush()
