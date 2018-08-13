@@ -893,7 +893,7 @@ def main():
         exp = args.expression
     else:
         sys.stdout.write('The expression profile of the simulated reads will be determined by input reads used in characterization step. \n')
-        exp = model_prefix
+        exp = model_prefix + "_abundance.tsv"
     if args.insertion_rate:
         ins_rate = float(args.insertion_rate)
     if args.deletion_rate:
