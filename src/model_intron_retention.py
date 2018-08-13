@@ -149,11 +149,12 @@ def intron_retention(outfile, ref_t):
     sum_first_introns = dict_first_intron_state[True] + dict_first_intron_state[False]
     sum_other_introns = sum(dict_states[key] for key in dict_states.keys())
 
-    fout = open(outfile + "_intron_retention_probs", 'w')
-    fout.write("first intron IR event probability: " + str(round(dict_first_intron_state[True] / float(sum_first_introns) * 100, 3)) + "\n")
-    fout.write("previous_state\tcurrent_state\tcount\tprob\n")
-    fout.write("False\tFalse\t" + str(dict_states[(False, False)]) + "\t" + str(round(dict_states[(False, False)] / float(sum_other_introns) * 100, 3)) + "\n")
-    fout.write("False\tTrue\t" + str(dict_states[(False, True)]) + "\t" + str(round(dict_states[(False, True)] / float(sum_other_introns) * 100, 3)) + "\n")
-    fout.write("True\tFalse\t" + str(dict_states[(True, False)]) + "\t" +str(round(dict_states[(True, False)] / float(sum_other_introns) * 100, 3)) + "\n")
-    fout.write("True\tTrue\t" + str(dict_states[(True, True)]) + "\t" + str(round(dict_states[(True, True)] / float(sum_other_introns) * 100, 3)) + "\n")
+    fout = open(outfile + "_IR_markov_model", 'w')
+    fout.write("succedent\tno_IR\tIR\n")
+    fout.write("start\t" + str(round(dict_first_intron_state[False] / float(sum_first_introns) * 100, 3)) + "\t" \
+               + str(round(dict_first_intron_state[True] / float(sum_first_introns) * 100, 3)) + "\n")
+    fout.write("no_IR\t" + str(round(dict_states[(False, False)] / float(sum_other_introns) * 100, 3)) + "\t" \
+               + str(round(dict_states[(False, True)] / float(sum_other_introns) * 100, 3)) + "\n")
+    fout.write("IR\t" + str(round(dict_states[(True, False)] / float(sum_other_introns) * 100, 3)) + "\t" \
+               + str(round(dict_states[(True, True)] / float(sum_other_introns) * 100, 3)) + "\n")
     fout.close()
