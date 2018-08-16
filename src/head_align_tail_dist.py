@@ -118,9 +118,13 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
                 total.append(read_len_total)
                 head, tail = get_head_tail(alnm.cigar)
                 middle = read_len_total - head - tail
-
-                out6.write(alnm.read.seq[:head] + "\n")
-                out7.write(alnm.read.seq[-tail:] + "\n")
+                head_seq = alnm.read.seq[:head]
+                if tail != 0:
+                    alnm.read.seq[-tail:]
+                else:
+                    tail_seq = ''
+                out6.write(head_seq + "\n")
+                out7.write(tail_seq + "\n")
 
                 #ratio aligned part over total length of the read
                 alignment_ratio = float(middle) / read_len_total
