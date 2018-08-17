@@ -111,8 +111,8 @@ def intron_retention(outfile, ref_t):
                 if primary_trx in dict_intron_info:
                     if len(dict_intron_info[primary_trx]) >= 1: #if there is a intron
                         dict_first_intron_state[False] += 1
-                    for i in range(1, len(dict_intron_info[primary_trx])):
-                        dict_states[(False, False)] += 1
+                        for i in range(1, len(dict_intron_info[primary_trx])):
+                            dict_states[(False, False)] += 1
             else:
                 # Now, go over all introns and check with the IR events
                 # First we need to determine the state of first intron:
