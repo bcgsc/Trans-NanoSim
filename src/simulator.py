@@ -158,8 +158,8 @@ def make_cdf(dict_exp, dict_len):
     ecdf_dict = {}
     for i in xrange(len(ranged_cdf_list)):
         cdf_range = ranged_cdf_list[i]
-        #ecdf_dict[cdf_range] = (sorted_value_list[i][0], dict_len[sorted_value_list[i][0]])
-        ecdf_dict[cdf_range] = dict_len[sorted_value_list[i][0]]
+        ecdf_dict[cdf_range] = (sorted_value_list[i][0], dict_len[sorted_value_list[i][0]])
+        #ecdf_dict[cdf_range] = dict_len[sorted_value_list[i][0]]
 
     return ecdf_dict
 
@@ -170,11 +170,11 @@ def select_ref_transcript(input_dict):
         p = random.random()
         for key, val in input_dict.items():
             if key[0] <= p < key[1]:
-                length = val
+                length = val[1]
                 break
         if length != 0:
             break
-    return length
+    return val[0], length
 
 
 def get_length_ratio(dict_ratio, len_ref):
@@ -256,7 +256,8 @@ def read_profile(number, model_prefix, per, max_l, min_l):
     global first_match_hist, align_ratio, ht_dict, error_model_profile
     global error_markov_model, match_markov_model
     global dict_head, dict_tail
-    global dict_ir_states
+    global IR_markov_model
+    global dict_ref_structure
 
     # Read model profile for match, mismatch, insertion and deletions
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read error profile\n")
@@ -284,6 +285,16 @@ def read_profile(number, model_prefix, per, max_l, min_l):
             error_markov_model[k][(0, float(info[1]))] = "mis"
             error_markov_model[k][(float(info[1]), float(info[1]) + float(info[2]))] = "ins"
             error_markov_model[k][(1 - float(info[3]), 1)] = "del"
+
+    IR_markov_model = {}
+    with open(model_prefix + "_IR_markov_model", "r") as  IR_markov:
+        IR_markov.readline()
+        for line in IR_markov:
+            info = line.strip().split()
+            k = info[0]
+            IR_markov_model[k] = {}
+            IR_markov_model[k][(0, float(info[1]))] = "no_IR"
+            IR_markov_model[k][(float(info[1]), float(info[1]) + float(info[2]))] = "IR"
 
     with open(model_prefix + "_first_match.hist", 'r') as fm_profile:
         first_match_hist = read_ecdf(fm_profile)
@@ -353,15 +364,37 @@ def read_profile(number, model_prefix, per, max_l, min_l):
             else:
                 dict_tail[len(tseq)].append(tseq)
 
-    dict_ir_states = {}
-    with open(model_prefix + "_intron_retention_probs", "r") as  ir_probs:
-        fline = ir_probs.readline()
-        f_intron_prob = float(fline.split("\t")[1])
-        dict_ir_states["first"] = f_intron_prob
-        sec_line = ir_probs.readline()
-        for line in ir_probs:
-            line_parts = line.split("\t")
-            dict_ir_states[(line_parts[0], line_parts[1])] = float(line_parts[-1])
+    dict_ref_structure = {}
+    gff_file = model_prefix + "_addedintron.gff3"
+    gff_features = HTSeq.GFF_Reader(gff_file, end_included=True)
+    features = HTSeq.GenomicArrayOfSets("auto", stranded=False)
+    for feature in gff_features:
+        if "Parent" in feature.attr:
+            info = feature.attr["Parent"].split(':')
+            if info[0] == "transcript":
+                feature_id = info[1]
+                if feature_id not in dict_ref_structure:
+                    dict_ref_structure[feature_id] = []
+        if feature.type == "exon" or feature.type == "intron":
+            dict_ref_structure[feature_id].append((feature.type, feature.iv.start, feature.iv.end, feature.iv.length))
+
+
+def add_ir_info(ref_trx, ref_trx_structure, IR_markov_model):
+    count = 0
+    for item in ref_trx_structure:
+        if item[0] == "intron":
+            count += 1
+
+    list_states = []
+    prev_state = "start"
+    for i in range (0, count):
+        p = random.random() * 100 #edit this part and remove 100. Edit intron retention code in characterizing step
+        for key in IR_markov_model[prev_state]:
+            if key[0] <= p < key[1]:
+                flag = IR_markov_model[prev_state][key]
+                list_states.append(flag)
+                prev_state = flag
+    return list_states
 
 
 def get_ht_sequence(dict_ht, length):
@@ -418,7 +451,8 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
     global first_match_hist, align_ratio, ht_dict, match_markov_model
     global error_markov_model, error_model_profile
     global dict_head, dict_tail
-    global dict_ir_states
+    global IR_markov_model
+    global dict_ref_structure
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read in reference transcriptome (length and expression)\n")
     sys.stdout.flush()
@@ -528,15 +562,36 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
         sleep(0.02)
         while True:
             #pick a reference to simulate a read out of it.
-            ref_len_total = max(50, select_ref_transcript(ecdf_dict_ref_exp))
-            #ref_len_total = get_length(reftotal_dict, 1, max_l, min_l)[0] # just for testing
+            ref_trx, ref_trx_len = select_ref_transcript(ecdf_dict_ref_exp)
+            ref_trx_structure = dict_ref_structure[ref_trx]
             #get the align region ratio out of this ref len total
-            key_range, ref_len_aligned = get_length_ratio(aligned_dict, ref_len_total)
-            if ref_len_aligned != 0:
-                middle_read, middle_ref, error_dict = error_list(ref_len_aligned, match_markov_model, first_match_hist, error_model_profile, error_markov_model)
-                if middle_ref < key_range[1]:
-                    break
+            key_range, ref_len_aligned = get_length_ratio(aligned_dict, ref_trx_len)
+            if ref_len_aligned > 50:
+                break
+                #middle_read, middle_ref, error_dict = error_list(ref_len_aligned, match_markov_model, first_match_hist, error_model_profile, error_markov_model)
+                #if middle_ref < key_range[1]:
+                    #break
 
+        ir_info = add_ir_info(ref_trx, ref_trx_structure, IR_markov_model)
+
+        if len(ir_info) == 0:
+            ir_length = 0
+        else:
+            #If there is a intron retention, addup aligned len + ir len and then extract from genome
+            i = -1
+            ir_pos = []
+            ir_length = 0
+            for item in ref_trx_structure:
+                if item[0] == "intron":
+                    i += 1
+                    if ir_info[i] == "IR":
+                        ir_pos.append(item)
+                        ir_length += item[-1]
+
+        #Include ir_length when introducing the error profiles
+        middle_read, middle_ref, error_dict = error_list(ref_len_aligned + ir_length, match_markov_model,first_match_hist, error_model_profile, error_markov_model)
+
+        ######Head and Tail analysis part starts#######
         for k_align in sorted(align_ratio.keys()):
             if k_align[0] <= middle_read < k_align[1]:
                 break
@@ -574,6 +629,8 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
                 p = random.random()
                 head = int(round(remainder * p))
                 tail = remainder - head
+        ######Head and Tail analysis part finishes#######
+
 
         try:
             # Extract error introduced middle region from reference transcript
@@ -657,7 +714,7 @@ def extract_read_withrange(length, key_range):
 
     seq_len_temp = {}
     for key, value in seq_len.items():
-        if key_range[0] < value <= key_range[1]:
+        if key_range[0] < value <= key_range[1]: #maybe I should write: if length < value <= key_range[1]: Then I can ignore the next if inside while loop
             seq_len_temp[key] = value
 
     while True:
@@ -669,6 +726,30 @@ def extract_read_withrange(length, key_range):
             new_read_name = key + "_" + str(ref_pos)
             break
     return new_read, new_read_name
+
+
+def extract_read_pos(length, ref_len, ref_trx_structure):
+    #The aim is to create a genomic interval object
+    #example: iv = HTSeq.GenomicInterval( "chr3", 123203, 127245, "+" )
+    chrom = ""
+    start = ""
+    end = ""
+    strand = ""
+    start_pos = random.randint(0, ref_len - length)
+    for item in ref_trx_structure:
+        if item == "exon":
+            if start_pos < item[-1]:
+                start = item[1] + start_pos
+                end = start + length
+            else:
+                start_pos -= item[-1]
+        elif item == "retained_intron":
+            end += item[-1]
+        else:
+
+
+
+
 
 
 def unaligned_error_list(length, error_p):
@@ -856,7 +937,6 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
-    reads = ''
     exp = ''
     model_prefix = ''
     out = ''
@@ -866,8 +946,7 @@ def main():
     kmer_bias = ''
     perfect = False
 
-    parser.add_argument('-r', '--read', help='Input reads to quanity expression profiles', type = str)
-    parser.add_argument('-f', '--ref', help='Input reference transcriptome', type = str, required= True)
+    parser.add_argument('-r', '--ref', help='Input reference transcriptome', type = str, required= True)
     parser.add_argument('-e', '--expression', help='Expression profile in the specified format provided with documentation', type = str)
     parser.add_argument('-c', '--model_prefix', help='Address for profiles created in characterization step (model_prefix)', type = str, default= "training")
     parser.add_argument('-o', '--output', help='Output address for simulated reads', type = str, default= "simulated")
@@ -887,8 +966,6 @@ def main():
     out = args.output
     number = args.number
 
-    if args.read:
-        reads = args.read
     if args.expression:
         exp = args.expression
     else:
@@ -911,7 +988,6 @@ def main():
 
 
     print ("Running the simulation step with following arguments: \n")
-    print ("reads: ", reads)
     print ("ref: ", ref)
     print ("expression: ", exp)
     print ("model_prefix: ", model_prefix)
@@ -922,7 +998,7 @@ def main():
     print ("mismatch_rate: ", mis_rate)
     print ("max_readlength: ", max_readlength)
     print ("min_readlength: ", min_readlength)
-    print("kmer_bias: ", kmer_bias)
+    print ("kmer_bias: ", kmer_bias)
     print ("perfect: ", perfect)
 
 
