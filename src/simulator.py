@@ -735,21 +735,50 @@ def extract_read_pos(length, ref_len, ref_trx_structure):
     start = ""
     end = ""
     strand = ""
+    list_intervals = []
     start_pos = random.randint(0, ref_len - length)
+    flag = False
     for item in ref_trx_structure:
-        if item == "exon":
-            if start_pos < item[-1]:
-                start = item[1] + start_pos
-                end = start + length
-            else:
-                start_pos -= item[-1]
-        elif item == "retained_intron":
-            end += item[-1]
-        else:
+        if item[0] == "exon":
+            if flag == False: #if it is first exon that I started extracting from
+                if start_pos < item[-1]:
+                    #print ("1", item, start_pos, length, start, end)
+                    flag = True
+                    start = start_pos + item[1]
+                    if (start + length) < item[2]:
+                        end = start + length
+                        length = 0
+                    else:
+                        end = item[2]
+                        length -= (item[2] - start)
+                    start_pos = 0
+                else:
+                    #print("2", item, start_pos, length, start, end)
+                    start_pos -= item[-1]
+            else: #if it is NOT the first exon that I start extracting from
+                #print("3", item, start_pos, length, start, end)
+                start_pos = 0
+                if (item[1] + length) < item[2]:
+                    end = item[1] + length
+                else:
+                    end = item[2]
+                    length -= (item[-1])
 
+        elif item[0] == "retained_intron":
+            #print("4", item, start_pos, length, start, end)
+            end = item[2]
+        elif item[0] == "intron":
+            #print("5", item, start_pos, length, start, end)
+            iv = HTSeq.GenomicInterval("chr3", start, end, "+")
+            list_intervals.append(iv)
+            start = 0
+            end = 0
+            start_pos = 0
+            flag = False
+    iv = HTSeq.GenomicInterval("chr3", start, end, "+")
+    list_intervals.append(iv)
 
-
-
+    return list_intervals
 
 
 def unaligned_error_list(length, error_p):
