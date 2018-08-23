@@ -379,7 +379,7 @@ def read_profile(number, model_prefix, per, max_l, min_l):
             dict_ref_structure[feature_id].append((feature.type, feature.iv.start, feature.iv.end, feature.iv.length))
 
 
-def add_ir_info(ref_trx, ref_trx_structure, IR_markov_model):
+def update_structure(ref_trx_structure, IR_markov_model):
     count = 0
     for item in ref_trx_structure:
         if item[0] == "intron":
@@ -394,7 +394,15 @@ def add_ir_info(ref_trx, ref_trx_structure, IR_markov_model):
                 flag = IR_markov_model[prev_state][key]
                 list_states.append(flag)
                 prev_state = flag
-    return list_states
+
+    j = -1
+    for i in range (0, len(ref_trx_structure)):
+        if ref_trx_structure[i][0] == "intron":
+            j += 1
+            if list_states[j] == "IR":
+                ref_trx_structure[i] = ("retained_intron",) + ref_trx_structure[1][1:]
+
+    return list_states, ref_trx_structure
 
 
 def get_ht_sequence(dict_ht, length):
@@ -445,7 +453,7 @@ def readfq(fp):  # this is a generator function
                 break
 
 
-def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
+def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
     global unaligned_length, number_aligned, aligned_dict, reftotal_dict
     global genome_len, seq_dict, seq_len, dict_exp, ecdf_dict_ref
     global first_match_hist, align_ratio, ht_dict, match_markov_model
@@ -453,6 +461,12 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
     global dict_head, dict_tail
     global IR_markov_model
     global dict_ref_structure
+
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read in reference genome and create .fai index file\n")
+    sys.stdout.flush()
+    # create and read the .fai file of the reference genome
+    genome_fai = pysam.Fastafile(ref_g)
+
 
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read in reference transcriptome (length and expression)\n")
     sys.stdout.flush()
@@ -462,7 +476,7 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
     dict_exp = {}
 
     # Read in the reference transcriptome
-    with open(ref, 'r') as infile:
+    with open(ref_t, 'r') as infile:
         for seqN, seqS, seqQ in readfq(infile):
             info = re.split(r'[_\s]\s*', seqN)
             transcript_id = "-".join(info)
@@ -572,24 +586,24 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
                 #if middle_ref < key_range[1]:
                     #break
 
-        ir_info = add_ir_info(ref_trx, ref_trx_structure, IR_markov_model)
-
-        if len(ir_info) == 0:
-            ir_length = 0
-        else:
-            #If there is a intron retention, addup aligned len + ir len and then extract from genome
-            i = -1
-            ir_pos = []
-            ir_length = 0
-            for item in ref_trx_structure:
-                if item[0] == "intron":
-                    i += 1
-                    if ir_info[i] == "IR":
-                        ir_pos.append(item)
-                        ir_length += item[-1]
+        ir_info, ref_trx_structure_new = update_structure(ref_trx_structure, IR_markov_model)
+        ir_length = 0
+        for item in ref_trx_structure_new:
+            if item[0] == "retained_intron":
+                ir_length += item[-1]
 
         #Include ir_length when introducing the error profiles
         middle_read, middle_ref, error_dict = error_list(ref_len_aligned + ir_length, match_markov_model,first_match_hist, error_model_profile, error_markov_model)
+        list_iv = extract_read_pos(ref_len_aligned + ir_length, ref_trx_len + ir_length , ref_trx_structure_new)
+        new_read = ""
+        for interval in list_iv:
+            chrom = ""
+            start = ""
+            end = ""
+            new_read += genome_fai.fetch(chrom, start, end)
+        new_read_name = "TransNanoSim_simulated_aligned_" + str(i + num_unaligned_length)
+
+
 
         ######Head and Tail analysis part starts#######
         for k_align in sorted(align_ratio.keys()):
@@ -632,6 +646,7 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
         ######Head and Tail analysis part finishes#######
 
 
+        '''
         try:
             # Extract error introduced middle region from reference transcript
             new_read, new_read_name = extract_read_withrange(middle_ref, key_range)
@@ -641,6 +656,7 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
             #the problem is that middle_ref length is larger than anything in the key range. Actually we should take care of this thing at error_list function !
             sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": ERROR >> " + str(i))
             sys.exit(1)
+        '''
 
         # Mutate read
         new_read = case_convert(new_read)
@@ -673,8 +689,7 @@ def simulation(ref, out, per, kmer_bias, max_l, min_l, exp):
         if kmer_bias:
             read_mutated = collapse_homo(read_mutated, kmer_bias)
 
-        out_reads.write(">" + new_read_name + "_" + str(head) + "_" + str(middle_ref) + "_" +
-                        str(tail) + '\n')
+        out_reads.write(">" + new_read_name + "_" + str(head) + "_" + str(middle_ref) + "_" + str(tail) + '\n')
         out_reads.write(read_mutated + '\n')
 
         i += 1
@@ -975,7 +990,8 @@ def main():
     kmer_bias = ''
     perfect = False
 
-    parser.add_argument('-r', '--ref', help='Input reference transcriptome', type = str, required= True)
+    parser.add_argument('-rt', '--ref_transcriptome', help='Input reference transcriptome', type = str, required= True)
+    parser.add_argument('-rg', '--ref_genome', help='Input reference genome', type=str, required=True)
     parser.add_argument('-e', '--expression', help='Expression profile in the specified format provided with documentation', type = str)
     parser.add_argument('-c', '--model_prefix', help='Address for profiles created in characterization step (model_prefix)', type = str, default= "training")
     parser.add_argument('-o', '--output', help='Output address for simulated reads', type = str, default= "simulated")
@@ -990,7 +1006,8 @@ def main():
 
     args = parser.parse_args()
 
-    ref = args.ref
+    ref_t = args.ref_transcriptome
+    ref_g = args.ref_genome
     model_prefix = args.model_prefix
     out = args.output
     number = args.number
@@ -1017,7 +1034,7 @@ def main():
 
 
     print ("Running the simulation step with following arguments: \n")
-    print ("ref: ", ref)
+    print ("ref_t: ", ref_t)
     print ("expression: ", exp)
     print ("model_prefix: ", model_prefix)
     print ("output: ", out)
@@ -1046,7 +1063,7 @@ def main():
     # Read in reference transcriptome and generate simulated reads
     read_profile(number, model_prefix, perfect, max_readlength, min_readlength)
 
-    simulation(ref, out, perfect, kmer_bias, max_readlength, min_readlength, exp)
+    simulation(ref_t, out, perfect, kmer_bias, max_readlength, min_readlength, exp)
 
     call("find . -name \*.pyc -delete", shell=True)
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
