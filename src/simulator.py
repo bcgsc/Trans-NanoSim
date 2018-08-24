@@ -376,7 +376,7 @@ def read_profile(number, model_prefix, per, max_l, min_l):
                 if feature_id not in dict_ref_structure:
                     dict_ref_structure[feature_id] = []
         if feature.type == "exon" or feature.type == "intron":
-            dict_ref_structure[feature_id].append((feature.type, feature.iv.start, feature.iv.end, feature.iv.length))
+            dict_ref_structure[feature_id].append((feature.type, feature.iv.chrom, feature.iv.start, feature.iv.end, feature.iv.length))
 
 
 def update_structure(ref_trx_structure, IR_markov_model):
@@ -400,7 +400,7 @@ def update_structure(ref_trx_structure, IR_markov_model):
         if ref_trx_structure[i][0] == "intron":
             j += 1
             if list_states[j] == "IR":
-                ref_trx_structure[i] = ("retained_intron",) + ref_trx_structure[1][1:]
+                ref_trx_structure[i] = ("retained_intron",) + ref_trx_structure[i][1:]
 
     return list_states, ref_trx_structure
 
@@ -594,14 +594,20 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
 
         #Include ir_length when introducing the error profiles
         middle_read, middle_ref, error_dict = error_list(ref_len_aligned + ir_length, match_markov_model,first_match_hist, error_model_profile, error_markov_model)
-        list_iv = extract_read_pos(ref_len_aligned + ir_length, ref_trx_len + ir_length , ref_trx_structure_new)
+
+        # I should update this part. Think about how long should I extract.
+        list_iv = extract_read_pos(ref_len_aligned, ref_trx_len, ref_trx_structure_new)
         new_read = ""
         for interval in list_iv:
-            chrom = ""
-            start = ""
-            end = ""
+            chrom = interval.chrom
+            start = interval.start
+            end = interval.end
             new_read += genome_fai.fetch(chrom, start, end)
+
+        new_read_length = len(new_read)
         new_read_name = "TransNanoSim_simulated_aligned_" + str(i + num_unaligned_length)
+
+
 
 
 
@@ -754,18 +760,19 @@ def extract_read_pos(length, ref_len, ref_trx_structure):
     start_pos = random.randint(0, ref_len - length)
     flag = False
     for item in ref_trx_structure:
+        chrom = item[1]
         if item[0] == "exon":
             if flag == False: #if it is first exon that I started extracting from
                 if start_pos < item[-1]:
                     #print ("1", item, start_pos, length, start, end)
                     flag = True
-                    start = start_pos + item[1]
-                    if (start + length) < item[2]:
+                    start = start_pos + item[2]
+                    if (start + length) < item[3]:
                         end = start + length
                         length = 0
                     else:
-                        end = item[2]
-                        length -= (item[2] - start)
+                        end = item[3]
+                        length -= (item[3] - start)
                     start_pos = 0
                 else:
                     #print("2", item, start_pos, length, start, end)
@@ -773,24 +780,26 @@ def extract_read_pos(length, ref_len, ref_trx_structure):
             else: #if it is NOT the first exon that I start extracting from
                 #print("3", item, start_pos, length, start, end)
                 start_pos = 0
-                if (item[1] + length) < item[2]:
-                    end = item[1] + length
+                if (item[2] + length) < item[3]:
+                    end = item[2] + length
                 else:
-                    end = item[2]
+                    end = item[3]
                     length -= (item[-1])
 
         elif item[0] == "retained_intron":
             #print("4", item, start_pos, length, start, end)
-            end = item[2]
+            end = item[3]
         elif item[0] == "intron":
             #print("5", item, start_pos, length, start, end)
-            iv = HTSeq.GenomicInterval("chr3", start, end, "+")
+            iv = HTSeq.GenomicInterval(chrom, start, end, ".")
             list_intervals.append(iv)
+            chrom = ""
             start = 0
             end = 0
+            strand = ""
             start_pos = 0
             flag = False
-    iv = HTSeq.GenomicInterval("chr3", start, end, "+")
+    iv = HTSeq.GenomicInterval(chrom, start, end, ".")
     list_intervals.append(iv)
 
     return list_intervals
