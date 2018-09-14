@@ -20,11 +20,9 @@ def invert_strand(iv):
     return iv2
 
 def intron_retention(outfile, ref_t):
-
     gff_file = outfile + "_addedintron.gff3"
     talnm_file = glob.glob(outfile + "_transcriptome_alnm.sam")[0]
     galnm_file = glob.glob(outfile + "_genome_alnm.sam")[0]
-
 
     #read intron information from GFF file
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Reading intron coordinates from GFF file\n")
