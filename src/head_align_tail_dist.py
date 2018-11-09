@@ -120,7 +120,7 @@ def head_align_tail(outfile, num_of_bins, alnm_ftype, dict_ref_len):
                 middle = read_len_total - head - tail
                 head_seq = alnm.read.seq[:head]
                 if tail != 0:
-                    alnm.read.seq[-tail:]
+                    tail_seq = alnm.read.seq[-tail:]
                 else:
                     tail_seq = ''
                 out6.write(head_seq + "\n")
