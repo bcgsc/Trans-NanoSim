@@ -94,10 +94,10 @@ def intron_retention(outfile, ref_t):
                             pos.append(iv2.end)
                         else:
                             if length_IR != 0:
-                                list_IR_positions.append(min(pos))
-                                list_IR_positions.append(max(pos))
                                 for intron in dict_intron_info[primary_trx]:
                                     if length_IR == intron[2]:
+                                        list_IR_positions.append(min(pos))
+                                        list_IR_positions.append(max(pos))
                                         ir_info = True
                                 length_IR = 0
                                 pos = []
@@ -130,7 +130,6 @@ def intron_retention(outfile, ref_t):
                     previous_state = False
 
                 # Then we will go over other introns:
-                current_state = False
                 for i in range (1, len(dict_intron_info[primary_trx])):
                     intron = dict_intron_info[primary_trx][i]
                     current_state = False
@@ -145,14 +144,19 @@ def intron_retention(outfile, ref_t):
                     previous_state = current_state
 
     sum_first_introns = dict_first_intron_state[True] + dict_first_intron_state[False]
-    sum_other_introns = sum(dict_states[key] for key in dict_states.keys())
+    sum_for_noIR = dict_states[(False, False)] + dict_states[(False, True)]
+    sum_for_IR = dict_states[(True, False)] + dict_states[(True, True)]
 
     fout = open(outfile + "_IR_markov_model", 'w')
     fout.write("succedent\tno_IR\tIR\n")
-    fout.write("start\t" + str(round(dict_first_intron_state[False] / float(sum_first_introns) * 100, 3)) + "\t" \
-               + str(round(dict_first_intron_state[True] / float(sum_first_introns) * 100, 3)) + "\n")
-    fout.write("no_IR\t" + str(round(dict_states[(False, False)] / float(sum_other_introns) * 100, 3)) + "\t" \
-               + str(round(dict_states[(False, True)] / float(sum_other_introns) * 100, 3)) + "\n")
-    fout.write("IR\t" + str(round(dict_states[(True, False)] / float(sum_other_introns) * 100, 3)) + "\t" \
-               + str(round(dict_states[(True, True)] / float(sum_other_introns) * 100, 3)) + "\n")
+
+    fout.write("start\t" + str(round(dict_first_intron_state[False] / float(sum_first_introns), 4)) + "\t" \
+               + str(round(dict_first_intron_state[True] / float(sum_first_introns), 4)) + "\n")
+
+    fout.write("no_IR\t" + str(round(dict_states[(False, False)] / float(sum_for_noIR), 4)) + "\t" \
+               + str(round(dict_states[(False, True)] / float(sum_for_noIR), 4)) + "\n")
+
+    fout.write("IR\t" + str(round(dict_states[(True, False)] / float(sum_for_IR), 4)) + "\t" \
+               + str(round(dict_states[(True, True)] / float(sum_for_IR), 4)) + "\n")
+
     fout.close()
