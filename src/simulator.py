@@ -4,7 +4,7 @@ Created on Jan 11, 2018
 
 @author: Saber HafezQorani
 
-This script generates simulated Oxford Nanopore 2D transcriptome reads.
+This script generates simulated Oxford Nanopore transcriptome reads.
 
 """
 
@@ -13,10 +13,13 @@ from __future__ import with_statement
 from subprocess import call
 import sys
 import glob
+import pysam
+import HTSeq
 import getopt
 import argparse
 import random
 import numpy
+import copy
 import time
 from time import sleep
 import operator
@@ -254,9 +257,8 @@ def get_length(len_dict, num, max_l, min_l):
 def read_profile(number, model_prefix, per, max_l, min_l):
     global unaligned_length, number_aligned, aligned_dict, reftotal_dict
     global first_match_hist, align_ratio, ht_dict, error_model_profile
-    global error_markov_model, match_markov_model
+    global error_markov_model, match_markov_model, IR_markov_model
     global dict_head, dict_tail
-    global IR_markov_model
     global dict_ref_structure
 
     # Read model profile for match, mismatch, insertion and deletions
@@ -275,6 +277,9 @@ def read_profile(number, model_prefix, per, max_l, min_l):
             else:
                 error_model_profile["del"] = [float(x) for x in new_line[1:]]
 
+    with open(model_prefix + "_match_markov_model", 'r') as mm_profile:
+        match_markov_model = read_ecdf(mm_profile)
+
     error_markov_model = {}
     with open(model_prefix + "_error_markov_model", "r") as error_markov:
         error_markov.readline()
@@ -286,6 +291,8 @@ def read_profile(number, model_prefix, per, max_l, min_l):
             error_markov_model[k][(float(info[1]), float(info[1]) + float(info[2]))] = "ins"
             error_markov_model[k][(1 - float(info[3]), 1)] = "del"
 
+    #if the model_ir is set to TRUE, then read and process IR markov model, otherwise, ignore it.
+    #Check for the file before reading it because it is an optional file in characterization and maybe it is not available.
     IR_markov_model = {}
     with open(model_prefix + "_IR_markov_model", "r") as  IR_markov:
         IR_markov.readline()
@@ -298,9 +305,6 @@ def read_profile(number, model_prefix, per, max_l, min_l):
 
     with open(model_prefix + "_first_match.hist", 'r') as fm_profile:
         first_match_hist = read_ecdf(fm_profile)
-
-    with open(model_prefix + "_match_markov_model", 'r') as mm_profile:
-        match_markov_model = read_ecdf(mm_profile)
 
     # Read length of unaligned reads
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read ECDF of unaligned reads\n")
@@ -388,7 +392,7 @@ def update_structure(ref_trx_structure, IR_markov_model):
     list_states = []
     prev_state = "start"
     for i in range (0, count):
-        p = random.random() * 100 #edit this part and remove 100. Edit intron retention code in characterizing step
+        p = random.random()
         for key in IR_markov_model[prev_state]:
             if key[0] <= p < key[1]:
                 flag = IR_markov_model[prev_state][key]
@@ -571,20 +575,22 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
 
     i = 0
     while i < number_aligned:
-        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Number of reads simulated >> " + str(i + num_unaligned_length) + "\r")
-        sys.stdout.flush()
-        sleep(0.02)
+        #sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Number of reads simulated >> " + str(i + num_unaligned_length) + "\r")
+        #sys.stdout.flush()
+        #sleep(0.02)
         while True:
             #pick a reference to simulate a read out of it.
             ref_trx, ref_trx_len = select_ref_transcript(ecdf_dict_ref_exp)
-            ref_trx_structure = dict_ref_structure[ref_trx]
-            #get the align region ratio out of this ref len total
-            key_range, ref_len_aligned = get_length_ratio(aligned_dict, ref_trx_len)
-            if ref_len_aligned > 50:
-                break
-                #middle_read, middle_ref, error_dict = error_list(ref_len_aligned, match_markov_model, first_match_hist, error_model_profile, error_markov_model)
-                #if middle_ref < key_range[1]:
-                    #break
+            ref_trx_temp = ref_trx.split(".")[0]
+            if ref_trx_temp in dict_ref_structure:
+                ref_trx_structure = copy.deepcopy(dict_ref_structure[ref_trx_temp])
+                #get the align region ratio out of this ref len total
+                key_range, ref_len_aligned = get_length_ratio(aligned_dict, ref_trx_len)
+                if ref_len_aligned > 50:
+                    break
+                    #middle_read, middle_ref, error_dict = error_list(ref_len_aligned, match_markov_model, first_match_hist, error_model_profile, error_markov_model)
+                    #if middle_ref < key_range[1]:
+                        #break
 
         ir_info, ref_trx_structure_new = update_structure(ref_trx_structure, IR_markov_model)
         ir_length = 0
@@ -595,8 +601,8 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
         #Include ir_length when introducing the error profiles
         middle_read, middle_ref, error_dict = error_list(ref_len_aligned + ir_length, match_markov_model,first_match_hist, error_model_profile, error_markov_model)
 
-        # I should update this part. Think about how long should I extract.
-        list_iv = extract_read_pos(ref_len_aligned, ref_trx_len, ref_trx_structure_new)
+        # I may update this part. Think about how long should I extract.
+        list_iv = extract_read_pos(ref_len_aligned + ir_length, ref_trx_len + ir_length, ref_trx_structure_new)
         new_read = ""
         for interval in list_iv:
             chrom = interval.chrom
@@ -753,8 +759,8 @@ def extract_read_pos(length, ref_len, ref_trx_structure):
     #The aim is to create a genomic interval object
     #example: iv = HTSeq.GenomicInterval( "chr3", 123203, 127245, "+" )
     chrom = ""
-    start = ""
-    end = ""
+    start = 0
+    end = 0
     strand = ""
     list_intervals = []
     start_pos = random.randint(0, ref_len - length)
@@ -792,7 +798,8 @@ def extract_read_pos(length, ref_len, ref_trx_structure):
         elif item[0] == "intron":
             #print("5", item, start_pos, length, start, end)
             iv = HTSeq.GenomicInterval(chrom, start, end, ".")
-            list_intervals.append(iv)
+            if iv.length != 0:
+                list_intervals.append(iv)
             chrom = ""
             start = 0
             end = 0
@@ -800,7 +807,8 @@ def extract_read_pos(length, ref_len, ref_trx_structure):
             start_pos = 0
             flag = False
     iv = HTSeq.GenomicInterval(chrom, start, end, ".")
-    list_intervals.append(iv)
+    if iv.length != 0:
+        list_intervals.append(iv)
 
     return list_intervals
 
@@ -929,7 +937,8 @@ def mutate_read(read, read_name, error_log, e_dict, k, aligned=True):
                 new_bases = ""
                 for i in xrange(val[1]):
                     tmp_bases = list(BASES)
-                    tmp_bases.remove(read[key + i])
+                    #tmp_bases.remove(read[key + i]) ##
+                    tmp_bases.remove(read[key]) ## Edited this part for testing
                     new_base = random.choice(tmp_bases)
                     new_bases += new_base
                 check_kmer = read[max(key - k + 1, 0): key] + new_bases + read[key + val[1]: key + val[1] + k - 1]
@@ -996,12 +1005,13 @@ def main():
     number = ''
     max_readlength = ''
     min_readlength = ''
-    kmer_bias = ''
+    kmer_bias = 0
     perfect = False
+    model_ir = False
 
     parser.add_argument('-rt', '--ref_transcriptome', help='Input reference transcriptome', type = str, required= True)
     parser.add_argument('-rg', '--ref_genome', help='Input reference genome', type=str, required=True)
-    parser.add_argument('-e', '--expression', help='Expression profile in the specified format provided with documentation', type = str)
+    parser.add_argument('-e', '--expression', help='Expression profile in the specified format specified in the documentation', type = str)
     parser.add_argument('-c', '--model_prefix', help='Address for profiles created in characterization step (model_prefix)', type = str, default= "training")
     parser.add_argument('-o', '--output', help='Output address for simulated reads', type = str, default= "simulated")
     parser.add_argument('-n', '--number', help='Number of reads to be simulated', type = int, default = 20000)
@@ -1011,7 +1021,8 @@ def main():
     parser.add_argument('-max', '--max_len', help='The maximum length for simulated reads', type=int, default= float("inf"))
     parser.add_argument('-min', '--min_len', help='The minimum length for simulated reads', type=int, default= 50)
     parser.add_argument('-k', '--KmerBias', help='Determine whether to considert Kmer Bias or not', type = int, default= 0)
-    parser.add_argument('--perfect', help='Ignore profiles and simulated perfect reads', action='store_true')
+    parser.add_argument('--model_ir', help='Consider Intron Retention model from characterization step when simulating reads', action='store_true')
+    parser.add_argument('--perfect', help='Ignore profiles and simulate perfect reads', action='store_true')
 
     args = parser.parse_args()
 
@@ -1040,10 +1051,13 @@ def main():
         perfect = True
     if args.KmerBias:
         kmer_bias = args.KmerBias
+    if args.model_ir:
+        model_ir = True
 
 
     print ("Running the simulation step with following arguments: \n")
     print ("ref_t: ", ref_t)
+    print ("ref_g:", ref_g)
     print ("expression: ", exp)
     print ("model_prefix: ", model_prefix)
     print ("output: ", out)
@@ -1055,29 +1069,30 @@ def main():
     print ("min_readlength: ", min_readlength)
     print ("kmer_bias: ", kmer_bias)
     print ("perfect: ", perfect)
+    print ("model_ir", model_ir)
 
 
     # Generate log file
-    sys.stdout.log = open(out + ".log", 'w')
+    log_file = open(out + ".log", 'w')
 
     # Record the command typed to log file
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ': ' + ' '.join(sys.argv) + '\n')
-    sys.stdout.log.write(strftime("%Y-%m-%d %H:%M:%S") + ': ' + ' '.join(sys.argv) + '\n')
+    log_file.write(strftime("%Y-%m-%d %H:%M:%S") + ': ' + ' '.join(sys.argv) + '\n')
     sys.stdout.flush()
 
     if max_readlength < min_readlength:
         print("maximum read length must be longer than minimum read length!")
         sys.exit(1)
 
-    # Read in reference transcriptome and generate simulated reads
+    # Read in profiles created in the characterization step
     read_profile(number, model_prefix, perfect, max_readlength, min_readlength)
-
-    simulation(ref_t, out, perfect, kmer_bias, max_readlength, min_readlength, exp)
+    # simulate reads
+    simulation(ref_t, ref_g, out, perfect, kmer_bias, max_readlength, min_readlength, exp)
 
     call("find . -name \*.pyc -delete", shell=True)
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
-    sys.stdout.log.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
-    sys.stdout.log.close()
+    log_file.write(strftime("%Y-%m-%d %H:%M:%S") + ": Finished!\n")
+    log_file.close()
 
 
 if __name__ == "__main__":
