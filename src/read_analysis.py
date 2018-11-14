@@ -94,7 +94,7 @@ def main():
     g_alnm = args.g_alnm
     t_alnm = args.t_alnm
     outfile = args.output
-    num_bins = max(args.num_bins, 1)
+    num_bins = max(args.num_bins, 20)
     num_threads = max(args.num_threads, 1)
 
     if args.no_model_fit:
@@ -118,6 +118,7 @@ def main():
     print ("model_fit", model_fit)
     print ("num_bins", num_bins)
     print ("num_threads", num_threads)
+    print ("model_intron_retention", intron_retention)
     print ("detect_IR", detect_IR)
     print ("quantify" , quantify)
 
