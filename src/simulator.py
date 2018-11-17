@@ -457,6 +457,14 @@ def readfq(fp):  # this is a generator function
                 break
 
 
+def ref_len_from_structure(input):
+    l = 0
+    for item in input:
+        if item[0] == "exon":
+            l += item[-1]
+    return l
+
+
 def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
     global unaligned_length, number_aligned, aligned_dict, reftotal_dict
     global genome_len, seq_dict, seq_len, dict_exp, ecdf_dict_ref
@@ -508,15 +516,13 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
     ecdf_dict_ref_exp = make_cdf(dict_exp, seq_len)
 
     # Start simulation
-    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of reads\n")
-    sys.stdout.flush()
     out_reads = open(out + "_reads.fasta", 'w')
     out_error = open(out + "_error_profile", 'w')
     out_error.write("Seq_name\tSeq_pos\terror_type\terror_length\tref_base\tseq_base\n")
 
     # Simulate unaligned reads
-    #sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of unaligned reads\n")
-    #sys.stdout.flush()
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Started simulation of unaligned reads\n")
+    sys.stdout.flush()
     num_unaligned_length = len(unaligned_length)
     for i in xrange(num_unaligned_length):
         sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Number of reads simulated >> " + str(i) + "\r")
@@ -544,8 +550,8 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
     del unaligned_length
 
     # Simulate aligned reads
-    #sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Start simulation of aligned reads\n")
-    #sys.stdout.flush()
+    sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Started simulation of aligned reads\n")
+    sys.stdout.flush()
 
     if per:
         read_total_len = get_length(aligned_dict, number_aligned, max_l, min_l)
@@ -575,22 +581,24 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
 
     i = 0
     while i < number_aligned:
-        #sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Number of reads simulated >> " + str(i + num_unaligned_length) + "\r")
-        #sys.stdout.flush()
-        #sleep(0.02)
+        sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Number of reads simulated >> " + str(i + num_unaligned_length) + "\r")
+        sys.stdout.flush()
+        sleep(0.02)
         while True:
             #pick a reference to simulate a read out of it.
             ref_trx, ref_trx_len = select_ref_transcript(ecdf_dict_ref_exp)
             ref_trx_temp = ref_trx.split(".")[0]
             if ref_trx_temp in dict_ref_structure:
                 ref_trx_structure = copy.deepcopy(dict_ref_structure[ref_trx_temp])
-                #get the align region ratio out of this ref len total
-                key_range, ref_len_aligned = get_length_ratio(aligned_dict, ref_trx_len)
-                if ref_len_aligned > 50:
-                    break
-                    #middle_read, middle_ref, error_dict = error_list(ref_len_aligned, match_markov_model, first_match_hist, error_model_profile, error_markov_model)
-                    #if middle_ref < key_range[1]:
-                        #break
+                ref_trx_len_fromstructure = ref_len_from_structure(ref_trx_structure)
+                if ref_trx_len == ref_trx_len_fromstructure:
+                    #get the align region ratio out of this ref len total
+                    key_range, ref_len_aligned = get_length_ratio(aligned_dict, ref_trx_len)
+                    if ref_len_aligned > 50:
+                        break
+                        #middle_read, middle_ref, error_dict = error_list(ref_len_aligned, match_markov_model, first_match_hist, error_model_profile, error_markov_model)
+                        #if middle_ref < key_range[1]:
+                            #break
 
         ir_info, ref_trx_structure_new = update_structure(ref_trx_structure, IR_markov_model)
         ir_length = 0
@@ -599,10 +607,10 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
                 ir_length += item[-1]
 
         #Include ir_length when introducing the error profiles
-        middle_read, middle_ref, error_dict = error_list(ref_len_aligned + ir_length, match_markov_model,first_match_hist, error_model_profile, error_markov_model)
+
 
         # I may update this part. Think about how long should I extract.
-        list_iv = extract_read_pos(ref_len_aligned + ir_length, ref_trx_len + ir_length, ref_trx_structure_new)
+        list_iv = extract_read_pos(ref_len_aligned, ref_trx_len, ref_trx_structure_new)
         new_read = ""
         for interval in list_iv:
             chrom = interval.chrom
@@ -613,7 +621,7 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
         new_read_length = len(new_read)
         new_read_name = "TransNanoSim_simulated_aligned_" + str(i + num_unaligned_length)
 
-
+        middle_read, middle_ref, error_dict = error_list(new_read_length, match_markov_model, first_match_hist, error_model_profile, error_markov_model)
 
 
 
@@ -672,8 +680,13 @@ def simulation(ref_t, ref_g, out, per, kmer_bias, max_l, min_l, exp):
 
         # Mutate read
         new_read = case_convert(new_read)
+        #try:
         read_mutated = mutate_read(new_read, new_read_name, out_error, error_dict, kmer_bias)
-
+        #except:
+            #print(i)
+            #print(new_read)
+            #print(error_dict)
+            #break
         # Reverse complement half of the reads
         p = random.random()
         if p < 0.5:
@@ -788,13 +801,15 @@ def extract_read_pos(length, ref_len, ref_trx_structure):
                 start_pos = 0
                 if (item[2] + length) < item[3]:
                     end = item[2] + length
+
                 else:
                     end = item[3]
                     length -= (item[-1])
 
         elif item[0] == "retained_intron":
             #print("4", item, start_pos, length, start, end)
-            end = item[3]
+            if flag != False:
+                end = item[3]
         elif item[0] == "intron":
             #print("5", item, start_pos, length, start, end)
             iv = HTSeq.GenomicInterval(chrom, start, end, ".")
