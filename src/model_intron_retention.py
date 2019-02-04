@@ -36,10 +36,10 @@ def intron_retention(outfile, ref_t):
                 feature_id = info[1]
                 if feature_id not in dict_intron_info:
                     dict_intron_info[feature_id] = []
-        if feature.type == "intron":
-            # feature_id_2 = feature.name.split(':')[1] #feature_id_2 is same as feature_id above if feature is intron, I was just checking and testing it. then removed this line.
-            features[feature.iv] += feature_id
-            dict_intron_info[feature_id].append((feature.iv.start, feature.iv.end, feature.iv.length))
+                    if feature.type == "intron":
+            		    # feature_id_2 = feature.name.split(':')[1] #feature_id_2 is same as feature_id above if feature is intron, I was just checking and testing it. then removed this line.
+            		    features[features.iv] += feature_id
+            		    dict_intron_info[feature_id].append((feature.iv.start, feature.iv.end, feature.iv.length))
 
     #read primary genome alignment for each read
     sys.stdout.write(strftime("%Y-%m-%d %H:%M:%S") + ": Read primary genome alignment for each read\n")
