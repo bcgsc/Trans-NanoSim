@@ -5,8 +5,8 @@ Trans-NanoSim is a fast and scalable read simulator that captures the technology
 
 ## Dependencies
 minimap2 (Tested with version 2.10)  
-LAST (Tested with version 581 and 916)
-GenomeTools : http://genometools.org/
+LAST (Tested with version 581 and 916)  
+GenomeTools : http://genometools.org/  
 Python (2.7 or >= 3.4)  
 Python packages:  
 * six  
