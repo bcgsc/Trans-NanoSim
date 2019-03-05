@@ -95,7 +95,7 @@ def main():
     t_alnm = args.t_alnm
     outfile = args.output
     num_bins = max(args.num_bins, 20)
-    num_threads = max(int(args.num_threads), 1)
+    num_threads = max(args.num_threads, 1)
 
     if args.no_model_fit:
         model_fit = False
@@ -177,7 +177,7 @@ def main():
     annot_filename, annot_file_extension = os.path.splitext(annot)
     annot_file_extension = annot_file_extension[1:]
     if annot_file_extension.upper() == "GTF":
-        call("gt gtf_to_gff3 -tidy -o " + outfile + ".gff3 " + annot, shell=True)
+        call("gt gtf_to_gff3 -tidy -o " + outfile + ".gff3" + annot, shell=True)
 
     # Next, add intron info into gff3:
     call("gt gff3 -tidy -retainids -checkids -addintrons -o " + outfile + "_addedintron.gff3 " + annot_filename + ".gff3", shell=True)
