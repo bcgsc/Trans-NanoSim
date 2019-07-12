@@ -1,3 +1,6 @@
+
+# This pipeline is now deprecated, please use [NanoSim](https://github.com/bcgsc/NanoSim) to simulate both genomic and transcriptomic ONT reads!
+
 # Trans-NanoSim
 Oxford nanopore transcriptome read simulator
 
